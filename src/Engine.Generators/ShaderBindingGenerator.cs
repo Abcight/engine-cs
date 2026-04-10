@@ -5,7 +5,7 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 
-namespace Engine.ShaderGen;
+namespace Engine.Generators;
 
 [Generator(LanguageNames.CSharp)]
 public sealed class ShaderBindingGenerator : IIncrementalGenerator {

@@ -1,3 +1,4 @@
+using System.Numerics;
 using System.Runtime.InteropServices;
 using Engine;
 using Engine.Graphics.Contexts;
@@ -42,11 +43,10 @@ public static class EntryPoint {
 	}
 }
 
-internal sealed class RainbowTriangleApp {
+internal sealed partial class RainbowTriangleApp {
 	private Shader<DemoShaderBinding>? _shader;
 	private VertexBuffer<RainbowVertex>? _vertexBuffer;
 	private IndexBuffer<uint>? _indexBuffer;
-	private bool _vertexLayoutConfigured;
 
 	public Result<Unit, GraphicsError> OnLoad(IWindowRenderContext context) {
 		RainbowVertex[] vertices = [
@@ -93,7 +93,6 @@ internal sealed class RainbowTriangleApp {
 		_vertexBuffer = vertexBuffer;
 		_indexBuffer = indexBuffer;
 		_shader = shaderLoad.Shader;
-		_vertexLayoutConfigured = false;
 
 		return Unit.Value;
 	}
@@ -114,15 +113,7 @@ internal sealed class RainbowTriangleApp {
 			pass.BindShader(_shader);
 			pass.BindVertexBuffer(_vertexBuffer);
 			pass.BindIndexBuffer(_indexBuffer);
-
-			if (!_vertexLayoutConfigured) {
-				pass.SetVertexLayout(VertexLayoutDescription.Create<RainbowVertex>(
-					new VertexElementDescription(0, VertexElementType.Float32, 3, 0),
-					new VertexElementDescription(1, VertexElementType.Float32, 3, sizeof(float) * 3)
-				));
-
-				_vertexLayoutConfigured = true;
-			}
+			pass.SetVertexLayout(RainbowVertex.Layout);
 
 			pass.DrawIndexed(
 				PrimitiveTopology.Triangles,
@@ -145,21 +136,14 @@ internal sealed class RainbowTriangleApp {
 		return Unit.Value;
 	}
 
+	[VertexLayout]
 	[StructLayout(LayoutKind.Sequential)]
-	private readonly struct RainbowVertex {
-		public readonly float Px;
-		public readonly float Py;
-		public readonly float Pz;
-		public readonly float R;
-		public readonly float G;
-		public readonly float B;
-		public RainbowVertex(float px, float py, float pz, float r, float g, float b) {
-			Px = px;
-			Py = py;
-			Pz = pz;
-			R = r;
-			G = g;
-			B = b;
+	private readonly partial struct RainbowVertex {
+		[VertexElement(0)] public readonly Vector3 Position;
+		[VertexElement(1)] public readonly Vector3 Color;
+		public RainbowVertex(float x, float y, float z, float r, float g, float b) {
+			Position = new(x, y, z);
+			Color = new(r, g, b);
 		}
 	}
 }

@@ -3,5 +3,6 @@
     <Nullable>enable</Nullable>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <NuGetAudit>false</NuGetAudit>
+    <BuildInParallel>false</BuildInParallel>
   </PropertyGroup>
 </Project>

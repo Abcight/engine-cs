@@ -38,10 +38,7 @@ public sealed class GeneratedShaderSchema {
 		FragmentShaderPath = fragmentShaderPath;
 		Uniforms = uniforms;
 	}
-
 	public string VertexShaderPath { get; }
-
 	public string FragmentShaderPath { get; }
-
 	public IReadOnlyList<GeneratedShaderUniform> Uniforms { get; }
 }

@@ -1,5 +1,8 @@
 namespace Engine;
 
-public readonly record struct Unit {
-	public static Unit Value => default;
+public sealed record Unit {
+	private Unit() {
+	}
+
+	public static Unit Value { get; } = new();
 }

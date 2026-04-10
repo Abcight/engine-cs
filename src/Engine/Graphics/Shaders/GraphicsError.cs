@@ -3,20 +3,28 @@ namespace Engine.Graphics.Shaders;
 public enum GraphicsErrorCode {
 	None = 0,
 	InvalidArgument,
+	InvalidState,
+	Unsupported,
 	DeviceDisposed,
 	InvalidContext,
 	BackendFailure,
 	Unexpected
 }
 
-public readonly record struct GraphicsError(GraphicsErrorCode Code, string Message) {
+public sealed record GraphicsError(GraphicsErrorCode Code, string Message) {
 
 	public bool IsNone => Code == GraphicsErrorCode.None;
 
-	public static GraphicsError None => new(GraphicsErrorCode.None, string.Empty);
+	public static GraphicsError None { get; } = new(GraphicsErrorCode.None, string.Empty);
 
 	public static GraphicsError InvalidArgument(string message) =>
 		new(GraphicsErrorCode.InvalidArgument, message);
+
+	public static GraphicsError InvalidState(string message) =>
+		new(GraphicsErrorCode.InvalidState, message);
+
+	public static GraphicsError Unsupported(string message) =>
+		new(GraphicsErrorCode.Unsupported, message);
 
 	public static GraphicsError DeviceDisposed(string message) =>
 		new(GraphicsErrorCode.DeviceDisposed, message);

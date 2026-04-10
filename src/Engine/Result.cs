@@ -1,58 +1,63 @@
+using System.Diagnostics.CodeAnalysis;
+
 namespace Engine;
 
 public abstract record Result<T, E>
-	where T : notnull
-	where E : notnull {
+	where T : class
+	where E : class {
 
-	public sealed record Ok(T Value) : Result<T, E>;
-	public sealed record Err(E Error) : Result<T, E>;
+	private Result() {
+	}
 
+	public sealed record Ok : Result<T, E> {
+		public Ok(T value) {
+			Value = value;
+		}
+
+		public new T Value { get; }
+
+		public void Deconstruct(out T value) {
+			value = Value;
+		}
+	}
+
+	public sealed record Err : Result<T, E> {
+		public Err(E error) {
+			Error = error;
+		}
+
+		public new E Error { get; }
+
+		public void Deconstruct(out E error) {
+			error = Error;
+		}
+	}
+
+	[MemberNotNullWhen(true, nameof(OkVariant))]
+	[MemberNotNullWhen(true, nameof(Value))]
+	[MemberNotNullWhen(false, nameof(ErrVariant))]
+	[MemberNotNullWhen(false, nameof(Error))]
 	public bool IsOk => this is Ok;
+
+	[MemberNotNullWhen(true, nameof(ErrVariant))]
+	[MemberNotNullWhen(true, nameof(Error))]
+	[MemberNotNullWhen(false, nameof(OkVariant))]
+	[MemberNotNullWhen(false, nameof(Value))]
 	public bool IsErr => this is Err;
 
-	public TResult Match<TResult>(Func<T, TResult> ok, Func<E, TResult> err) {
-		ArgumentNullException.ThrowIfNull(ok);
-		ArgumentNullException.ThrowIfNull(err);
-		return this switch {
-			Ok(var value) => ok(value),
-			Err(var error) => err(error),
-			_ => throw new InvalidOperationException("Invalid result state.")
-		};
-	}
+	public Ok? OkVariant => this as Ok;
+	public Err? ErrVariant => this as Err;
 
-	public void Switch(Action<T> ok, Action<E> err) {
-		ArgumentNullException.ThrowIfNull(ok);
-		ArgumentNullException.ThrowIfNull(err);
-		switch (this) {
-			case Ok(var value):
-				ok(value);
-				return;
-			case Err(var error):
-				err(error);
-				return;
-			default:
-				throw new InvalidOperationException("Invalid result state.");
-		}
-	}
+	public T? Value => OkVariant is { } ok ? ok.Value : default;
+	public E? Error => ErrVariant is { } err ? err.Error : default;
 
-	public bool TryOk(out T value) {
-		if (this is Ok(var okValue)) {
-			value = okValue;
-			return true;
-		}
+	public Ok? TryOk() => OkVariant;
+	public Err? TryErr() => ErrVariant;
 
-		value = default!;
-		return false;
-	}
-
-	public bool TryErr(out E error) {
-		if (this is Err(var errValue)) {
-			error = errValue;
-			return true;
-		}
-
-		error = default!;
-		return false;
+	public void Deconstruct(out bool isOk, out Ok? ok, out Err? err) {
+		isOk = IsOk;
+		ok = OkVariant;
+		err = ErrVariant;
 	}
 
 	public static implicit operator Result<T, E>(T value) => new Ok(value);

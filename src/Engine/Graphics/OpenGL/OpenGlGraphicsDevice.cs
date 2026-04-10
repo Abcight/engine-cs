@@ -1,12 +1,18 @@
 using System.Numerics;
+using System.Reflection;
+using System.Runtime.InteropServices;
+using Engine.Graphics.Resources;
 using Engine.Graphics.Shaders;
 using OpenTK.Graphics.OpenGL4;
 using OpenTkMatrix4 = OpenTK.Mathematics.Matrix4;
+using GlTextureMagFilter = OpenTK.Graphics.OpenGL4.TextureMagFilter;
+using GlTextureMinFilter = OpenTK.Graphics.OpenGL4.TextureMinFilter;
 
 namespace Engine.Graphics.OpenGL;
 
 public sealed class OpenGlGraphicsDevice : IGraphicsDevice, IOpenGlNativeAccess {
 	private bool _disposed;
+	private int _defaultVertexArray;
 
 	public Result<IRenderPassContext, GraphicsError> BeginRenderPass(string? label = null) {
 		if (_disposed) {
@@ -14,12 +20,344 @@ public sealed class OpenGlGraphicsDevice : IGraphicsDevice, IOpenGlNativeAccess 
 		}
 
 		try {
+			var vaoResult = EnsureDefaultVertexArray();
+			if (vaoResult.TryErr() is { Error: var error }) {
+				return error;
+			}
+
+			GL.BindVertexArray(_defaultVertexArray);
+
 			if (!string.IsNullOrWhiteSpace(label)) {
 				PushDebugGroup(label);
 			}
+
 			return new OpenGlRenderPassContext(this, label);
 		} catch (Exception exception) {
 			return GraphicsError.Unexpected($"Failed to begin render pass: {exception.Message}");
+		}
+	}
+
+	public Result<VertexBuffer<TVertex>, GraphicsError> CreateVertexBuffer<TVertex>(
+		ReadOnlySpan<TVertex> vertices,
+		BufferUsage usage = BufferUsage.StaticDraw,
+		string? label = null
+	)
+		where TVertex : unmanaged {
+		if (_disposed) {
+			return GraphicsError.DeviceDisposed("Cannot create a vertex buffer on a disposed graphics device.");
+		}
+
+		int handle = 0;
+		try {
+			handle = GL.GenBuffer();
+			if (handle == 0) {
+				return GraphicsError.BackendFailure("OpenGL failed to allocate a vertex buffer.");
+			}
+
+			var usageHint = ToBufferUsageHint(usage);
+			GL.BindBuffer(BufferTarget.ArrayBuffer, handle);
+			UploadBufferData(BufferTarget.ArrayBuffer, vertices, usageHint);
+			TrySetObjectLabel(ObjectLabelIdentifier.Buffer, handle, label);
+
+			var buffer = new VertexBuffer<TVertex>(
+				vertexCount: vertices.Length,
+				strideBytes: Marshal.SizeOf<TVertex>(),
+				bindAction: context => {
+					if (!TryGetCompatibleContext(context, this, out _, out GraphicsError contextError)) {
+						return contextError;
+					}
+
+					try {
+						if (!GL.IsBuffer(handle)) {
+							return GraphicsError.InvalidState("Cannot bind a deleted vertex buffer.");
+						}
+
+						GL.BindBuffer(BufferTarget.ArrayBuffer, handle);
+						return Unit.Value;
+					} catch (Exception exception) {
+						return GraphicsError.BackendFailure($"Failed to bind vertex buffer: {exception.Message}");
+					}
+				},
+				setDataAction: data => {
+					try {
+						if (!GL.IsBuffer(handle)) {
+							return GraphicsError.InvalidState("Cannot update a deleted vertex buffer.");
+						}
+
+						GL.BindBuffer(BufferTarget.ArrayBuffer, handle);
+						UploadBufferData(BufferTarget.ArrayBuffer, data, usageHint);
+						return Unit.Value;
+					} catch (Exception exception) {
+						return GraphicsError.BackendFailure($"Failed to update vertex buffer: {exception.Message}");
+					}
+				},
+				disposeAction: () => {
+					try {
+						if (GL.IsBuffer(handle)) {
+							GL.DeleteBuffer(handle);
+						}
+
+						return Unit.Value;
+					} catch (Exception exception) {
+						return GraphicsError.BackendFailure($"Failed to dispose vertex buffer: {exception.Message}");
+					}
+				}
+			);
+
+			return buffer;
+		} catch (Exception exception) {
+			try {
+				if (handle != 0 && GL.IsBuffer(handle)) {
+					GL.DeleteBuffer(handle);
+				}
+			} catch (Exception) {
+			}
+
+			return GraphicsError.Unexpected($"Unexpected vertex buffer creation failure: {exception.Message}");
+		}
+	}
+
+	public Result<IndexBuffer<TIndex>, GraphicsError> CreateIndexBuffer<TIndex>(
+		ReadOnlySpan<TIndex> indices,
+		BufferUsage usage = BufferUsage.StaticDraw,
+		string? label = null
+	)
+		where TIndex : unmanaged {
+		if (_disposed) {
+			return GraphicsError.DeviceDisposed("Cannot create an index buffer on a disposed graphics device.");
+		}
+
+		if (!TryGetIndexElementType<TIndex>(out IndexElementType indexElementType, out int elementSizeInBytes)) {
+			return GraphicsError.Unsupported(
+				$"Index element type '{typeof(TIndex).Name}' is not supported. Use byte, ushort, or uint."
+			);
+		}
+
+		int handle = 0;
+		try {
+			handle = GL.GenBuffer();
+			if (handle == 0) {
+				return GraphicsError.BackendFailure("OpenGL failed to allocate an index buffer.");
+			}
+
+			var usageHint = ToBufferUsageHint(usage);
+			GL.BindBuffer(BufferTarget.ElementArrayBuffer, handle);
+			UploadBufferData(BufferTarget.ElementArrayBuffer, indices, usageHint);
+			TrySetObjectLabel(ObjectLabelIdentifier.Buffer, handle, label);
+
+			var buffer = new IndexBuffer<TIndex>(
+				indexCount: indices.Length,
+				elementSizeInBytes: elementSizeInBytes,
+				elementType: indexElementType,
+				bindAction: context => {
+					if (!TryGetCompatibleContext(context, this, out _, out GraphicsError contextError)) {
+						return contextError;
+					}
+
+					try {
+						if (!GL.IsBuffer(handle)) {
+							return GraphicsError.InvalidState("Cannot bind a deleted index buffer.");
+						}
+
+						GL.BindBuffer(BufferTarget.ElementArrayBuffer, handle);
+						return Unit.Value;
+					} catch (Exception exception) {
+						return GraphicsError.BackendFailure($"Failed to bind index buffer: {exception.Message}");
+					}
+				},
+				setDataAction: data => {
+					try {
+						if (!GL.IsBuffer(handle)) {
+							return GraphicsError.InvalidState("Cannot update a deleted index buffer.");
+						}
+
+						GL.BindBuffer(BufferTarget.ElementArrayBuffer, handle);
+						UploadBufferData(BufferTarget.ElementArrayBuffer, data, usageHint);
+						return Unit.Value;
+					} catch (Exception exception) {
+						return GraphicsError.BackendFailure($"Failed to update index buffer: {exception.Message}");
+					}
+				},
+				disposeAction: () => {
+					try {
+						if (GL.IsBuffer(handle)) {
+							GL.DeleteBuffer(handle);
+						}
+
+						return Unit.Value;
+					} catch (Exception exception) {
+						return GraphicsError.BackendFailure($"Failed to dispose index buffer: {exception.Message}");
+					}
+				}
+			);
+
+			return buffer;
+		} catch (Exception exception) {
+			try {
+				if (handle != 0 && GL.IsBuffer(handle)) {
+					GL.DeleteBuffer(handle);
+				}
+			} catch (Exception) {
+			}
+
+			return GraphicsError.Unexpected($"Unexpected index buffer creation failure: {exception.Message}");
+		}
+	}
+
+	public Result<Texture2D, GraphicsError> CreateTexture2D(
+		Texture2DDescriptor descriptor,
+		ReadOnlySpan<byte> pixels,
+		string? label = null
+	) {
+		if (_disposed) {
+			return GraphicsError.DeviceDisposed("Cannot create a texture on a disposed graphics device.");
+		}
+
+		if (descriptor.Width <= 0 || descriptor.Height <= 0) {
+			return GraphicsError.InvalidArgument("Texture dimensions must be greater than zero.");
+		}
+
+		if (!TryGetTextureFormatSpec(descriptor.Format, out TextureFormatSpec formatSpec)) {
+			return GraphicsError.Unsupported($"Texture format '{descriptor.Format}' is not supported by the OpenGL backend.");
+		}
+
+		if (!TryGetExpectedPixelByteCount(descriptor, formatSpec, out int expectedByteCount)) {
+			return GraphicsError.InvalidArgument("Texture dimensions are too large and overflowed byte size calculation.");
+		}
+
+		if (!pixels.IsEmpty && pixels.Length != expectedByteCount) {
+			return GraphicsError.InvalidArgument(
+				$"Texture upload byte count mismatch. Expected {expectedByteCount} bytes, got {pixels.Length}."
+			);
+		}
+
+		int handle = 0;
+		try {
+			handle = GL.GenTexture();
+			if (handle == 0) {
+				return GraphicsError.BackendFailure("OpenGL failed to allocate a texture object.");
+			}
+
+			GL.BindTexture(TextureTarget.Texture2D, handle);
+			GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)ToGlMinFilter(descriptor.MinFilter));
+			GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, (int)ToGlMagFilter(descriptor.MagFilter));
+			GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapS, (int)ToGlWrap(descriptor.WrapU));
+			GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapT, (int)ToGlWrap(descriptor.WrapV));
+
+			if (pixels.IsEmpty) {
+				GL.TexImage2D(
+					TextureTarget.Texture2D,
+					0,
+					formatSpec.InternalFormat,
+					descriptor.Width,
+					descriptor.Height,
+					0,
+					formatSpec.PixelFormat,
+					formatSpec.PixelType,
+					IntPtr.Zero
+				);
+			} else {
+				byte[] initialPixels = pixels.ToArray();
+				GL.TexImage2D(
+					TextureTarget.Texture2D,
+					0,
+					formatSpec.InternalFormat,
+					descriptor.Width,
+					descriptor.Height,
+					0,
+					formatSpec.PixelFormat,
+					formatSpec.PixelType,
+					initialPixels
+				);
+			}
+
+			if (descriptor.GenerateMipmaps) {
+				GL.GenerateMipmap(GenerateMipmapTarget.Texture2D);
+			}
+
+			TrySetObjectLabel(ObjectLabelIdentifier.Texture, handle, label);
+
+			var texture = new Texture2D(
+				descriptor,
+				bindAction: (context, textureUnit) => {
+					if (!TryGetCompatibleContext(context, this, out _, out GraphicsError contextError)) {
+						return contextError;
+					}
+
+					if (textureUnit < 0) {
+						return GraphicsError.InvalidArgument("Texture unit cannot be negative.");
+					}
+
+					try {
+						if (!GL.IsTexture(handle)) {
+							return GraphicsError.InvalidState("Cannot bind a deleted texture.");
+						}
+
+						GL.ActiveTexture(TextureUnit.Texture0 + textureUnit);
+						GL.BindTexture(TextureTarget.Texture2D, handle);
+						return Unit.Value;
+					} catch (Exception exception) {
+						return GraphicsError.BackendFailure($"Failed to bind texture: {exception.Message}");
+					}
+				},
+				setPixelsAction: updatedPixels => {
+					if (updatedPixels.Length != expectedByteCount) {
+						return GraphicsError.InvalidArgument(
+							$"Texture update byte count mismatch. Expected {expectedByteCount} bytes, got {updatedPixels.Length}."
+						);
+					}
+
+					try {
+						if (!GL.IsTexture(handle)) {
+							return GraphicsError.InvalidState("Cannot update a deleted texture.");
+						}
+
+						byte[] pixelBytes = updatedPixels.ToArray();
+						GL.BindTexture(TextureTarget.Texture2D, handle);
+						GL.TexSubImage2D(
+							TextureTarget.Texture2D,
+							0,
+							0,
+							0,
+							descriptor.Width,
+							descriptor.Height,
+							formatSpec.PixelFormat,
+							formatSpec.PixelType,
+							pixelBytes
+						);
+
+						if (descriptor.GenerateMipmaps) {
+							GL.GenerateMipmap(GenerateMipmapTarget.Texture2D);
+						}
+
+						return Unit.Value;
+					} catch (Exception exception) {
+						return GraphicsError.BackendFailure($"Failed to update texture pixels: {exception.Message}");
+					}
+				},
+				disposeAction: () => {
+					try {
+						if (GL.IsTexture(handle)) {
+							GL.DeleteTexture(handle);
+						}
+
+						return Unit.Value;
+					} catch (Exception exception) {
+						return GraphicsError.BackendFailure($"Failed to dispose texture: {exception.Message}");
+					}
+				}
+			);
+
+			return texture;
+		} catch (Exception exception) {
+			try {
+				if (handle != 0 && GL.IsTexture(handle)) {
+					GL.DeleteTexture(handle);
+				}
+			} catch (Exception) {
+			}
+
+			return GraphicsError.Unexpected($"Unexpected texture creation failure: {exception.Message}");
 		}
 	}
 
@@ -103,8 +441,8 @@ public sealed class OpenGlGraphicsDevice : IGraphicsDevice, IOpenGlNativeAccess 
 			var shader = new Shader<TBinding>(
 				binding,
 				(context, inner) => {
-					if (context is not OpenGlRenderPassContext openGlContext || !ReferenceEquals(openGlContext.Owner, this)) {
-						return GraphicsError.InvalidContext("Shader was bound on an incompatible render pass context.");
+					if (!TryGetCompatibleContext(context, this, out _, out GraphicsError contextError)) {
+						return contextError;
 					}
 
 					try {
@@ -165,36 +503,277 @@ public sealed class OpenGlGraphicsDevice : IGraphicsDevice, IOpenGlNativeAccess 
 			return;
 		}
 
+		if (_defaultVertexArray != 0) {
+			try {
+				if (GL.IsVertexArray(_defaultVertexArray)) {
+					GL.DeleteVertexArray(_defaultVertexArray);
+				}
+			} catch (Exception) {
+			}
+		}
+
 		_disposed = true;
-		GC.SuppressFinalize(this);
 	}
 
-	private static bool TryReadShaderSource(string shaderPath, out string source, out string error) {
-		string resolvedPath = ResolveRuntimePath(shaderPath);
+	private Result<Unit, GraphicsError> EnsureDefaultVertexArray() {
+		if (_defaultVertexArray != 0) {
+			return Unit.Value;
+		}
 
-		if (!File.Exists(resolvedPath)) {
-			source = string.Empty;
-			error = $"Shader file '{shaderPath}' was not found. Resolved path: '{resolvedPath}'.";
+		try {
+			_defaultVertexArray = GL.GenVertexArray();
+			if (_defaultVertexArray == 0) {
+				return GraphicsError.BackendFailure("OpenGL failed to allocate the default vertex array object.");
+			}
+
+			return Unit.Value;
+		} catch (Exception exception) {
+			return GraphicsError.BackendFailure($"Failed to allocate default vertex array: {exception.Message}");
+		}
+	}
+
+	private static bool TryGetCompatibleContext(
+		IRenderPassContext context,
+		OpenGlGraphicsDevice owner,
+		out OpenGlRenderPassContext? openGlContext,
+		out GraphicsError error
+	) {
+		if (context is not OpenGlRenderPassContext typedContext || !ReferenceEquals(typedContext.Owner, owner)) {
+			openGlContext = null;
+			error = GraphicsError.InvalidContext("Resource was used with an incompatible render pass context.");
 			return false;
 		}
 
-		source = File.ReadAllText(resolvedPath);
-		error = string.Empty;
+		if (typedContext.IsDisposed) {
+			openGlContext = typedContext;
+			error = GraphicsError.InvalidContext("Render pass context has already been disposed.");
+			return false;
+		}
+
+		openGlContext = typedContext;
+		error = GraphicsError.None;
 		return true;
 	}
 
-	private static string ResolveRuntimePath(string path) {
+	private static BufferUsageHint ToBufferUsageHint(BufferUsage usage) {
+		return usage switch {
+			BufferUsage.StaticDraw => BufferUsageHint.StaticDraw,
+			BufferUsage.DynamicDraw => BufferUsageHint.DynamicDraw,
+			BufferUsage.StreamDraw => BufferUsageHint.StreamDraw,
+			_ => BufferUsageHint.StaticDraw
+		};
+	}
+
+	private static GlTextureMinFilter ToGlMinFilter(Engine.Graphics.Resources.TextureMinFilter filter) {
+		return filter switch {
+			Engine.Graphics.Resources.TextureMinFilter.Nearest => GlTextureMinFilter.Nearest,
+			Engine.Graphics.Resources.TextureMinFilter.Linear => GlTextureMinFilter.Linear,
+			Engine.Graphics.Resources.TextureMinFilter.NearestMipmapNearest => GlTextureMinFilter.NearestMipmapNearest,
+			Engine.Graphics.Resources.TextureMinFilter.LinearMipmapLinear => GlTextureMinFilter.LinearMipmapLinear,
+			_ => GlTextureMinFilter.Linear
+		};
+	}
+
+	private static GlTextureMagFilter ToGlMagFilter(Engine.Graphics.Resources.TextureMagFilter filter) {
+		return filter switch {
+			Engine.Graphics.Resources.TextureMagFilter.Nearest => GlTextureMagFilter.Nearest,
+			Engine.Graphics.Resources.TextureMagFilter.Linear => GlTextureMagFilter.Linear,
+			_ => GlTextureMagFilter.Linear
+		};
+	}
+
+	private static TextureWrapMode ToGlWrap(TextureWrap wrap) {
+		return wrap switch {
+			TextureWrap.Repeat => TextureWrapMode.Repeat,
+			TextureWrap.ClampToEdge => TextureWrapMode.ClampToEdge,
+			TextureWrap.MirroredRepeat => TextureWrapMode.MirroredRepeat,
+			_ => TextureWrapMode.Repeat
+		};
+	}
+
+	private static bool TryGetTextureFormatSpec(TextureFormat format, out TextureFormatSpec spec) {
+		spec = format switch {
+			TextureFormat.R8 => new TextureFormatSpec(PixelInternalFormat.R8, PixelFormat.Red, PixelType.UnsignedByte, 1),
+			TextureFormat.RG8 => new TextureFormatSpec(PixelInternalFormat.Rg8, PixelFormat.Rg, PixelType.UnsignedByte, 2),
+			TextureFormat.RGB8 => new TextureFormatSpec(PixelInternalFormat.Rgb8, PixelFormat.Rgb, PixelType.UnsignedByte, 3),
+			TextureFormat.RGBA8 => new TextureFormatSpec(PixelInternalFormat.Rgba8, PixelFormat.Rgba, PixelType.UnsignedByte, 4),
+			_ => default
+		};
+
+		return spec.BytesPerPixel > 0;
+	}
+
+	private static bool TryGetExpectedPixelByteCount(
+		Texture2DDescriptor descriptor,
+		TextureFormatSpec formatSpec,
+		out int byteCount
+	) {
+		try {
+			byteCount = checked(descriptor.Width * descriptor.Height * formatSpec.BytesPerPixel);
+			return true;
+		} catch (OverflowException) {
+			byteCount = 0;
+			return false;
+		}
+	}
+
+	private static bool TryGetIndexElementType<TIndex>(
+		out IndexElementType elementType,
+		out int elementSizeInBytes
+	)
+		where TIndex : unmanaged {
+		var indexType = typeof(TIndex);
+
+		if (indexType == typeof(byte)) {
+			elementType = IndexElementType.UnsignedByte;
+			elementSizeInBytes = 1;
+			return true;
+		}
+
+		if (indexType == typeof(ushort)) {
+			elementType = IndexElementType.UnsignedShort;
+			elementSizeInBytes = 2;
+			return true;
+		}
+
+		if (indexType == typeof(uint)) {
+			elementType = IndexElementType.UnsignedInt;
+			elementSizeInBytes = 4;
+			return true;
+		}
+
+		elementType = default;
+		elementSizeInBytes = 0;
+		return false;
+	}
+
+	private static void UploadBufferData<T>(
+		BufferTarget target,
+		ReadOnlySpan<T> data,
+		BufferUsageHint usageHint
+	)
+		where T : unmanaged {
+		int sizeInBytes = checked(data.Length * Marshal.SizeOf<T>());
+		if (data.IsEmpty) {
+			GL.BufferData(target, sizeInBytes, IntPtr.Zero, usageHint);
+			return;
+		}
+
+		T[] managedData = data.ToArray();
+		GL.BufferData(target, sizeInBytes, managedData, usageHint);
+	}
+
+	private static void TrySetObjectLabel(ObjectLabelIdentifier identifier, int handle, string? label) {
+		if (string.IsNullOrWhiteSpace(label)) {
+			return;
+		}
+
+		try {
+			GL.ObjectLabel(identifier, handle, label.Length, label);
+		} catch (Exception) {
+		}
+	}
+
+	private static bool TryReadShaderSource(string shaderPath, out string source, out string error) {
+		if (!TryResolveRuntimePath(shaderPath, out string resolvedPath, out string attemptedPaths)) {
+			source = string.Empty;
+			error = $"Shader file '{shaderPath}' was not found. Attempted paths:{Environment.NewLine}{attemptedPaths}";
+			return false;
+		}
+
+		try {
+			source = File.ReadAllText(resolvedPath);
+			error = string.Empty;
+			return true;
+		} catch (Exception exception) {
+			source = string.Empty;
+			error = $"Failed to read shader file '{resolvedPath}': {exception.Message}";
+			return false;
+		}
+	}
+
+	private static bool TryResolveRuntimePath(string path, out string resolvedPath, out string attemptedPaths) {
+		var candidates = new List<string>();
+
+		void AddCandidate(string candidate) {
+			if (string.IsNullOrWhiteSpace(candidate)) {
+				return;
+			}
+
+			string fullPath;
+			try {
+				fullPath = Path.GetFullPath(candidate);
+			} catch (Exception) {
+				return;
+			}
+
+			if (!candidates.Contains(fullPath, StringComparer.Ordinal)) {
+				candidates.Add(fullPath);
+			}
+		}
+
 		if (Path.IsPathRooted(path)) {
-			return path;
+			AddCandidate(path);
 		}
 
-		string fromBase = Path.GetFullPath(path, AppContext.BaseDirectory);
+		string baseDirectory = AppContext.BaseDirectory;
+		string currentDirectory = Directory.GetCurrentDirectory();
+		string? entryAssemblyName = Assembly.GetEntryAssembly()?.GetName().Name;
 
-		if (File.Exists(fromBase)) {
-			return fromBase;
+		AddCandidate(Path.Combine(baseDirectory, path));
+		AddCandidate(Path.Combine(currentDirectory, path));
+
+		foreach (string directory in EnumerateSelfAndParents(baseDirectory, 8)) {
+			AddCandidate(Path.Combine(directory, path));
+
+			if (!string.IsNullOrWhiteSpace(entryAssemblyName)) {
+				AddCandidate(Path.Combine(directory, "src", entryAssemblyName, path));
+				AddCandidate(Path.Combine(directory, entryAssemblyName, path));
+			}
 		}
 
-		return Path.GetFullPath(path, Directory.GetCurrentDirectory());
+		foreach (string directory in EnumerateSelfAndParents(currentDirectory, 8)) {
+			AddCandidate(Path.Combine(directory, path));
+
+			if (!string.IsNullOrWhiteSpace(entryAssemblyName)) {
+				AddCandidate(Path.Combine(directory, "src", entryAssemblyName, path));
+				AddCandidate(Path.Combine(directory, entryAssemblyName, path));
+			}
+		}
+
+		foreach (string candidate in candidates) {
+			if (File.Exists(candidate)) {
+				resolvedPath = candidate;
+				attemptedPaths = string.Join(
+					Environment.NewLine,
+					candidates.Select(static candidatePath => $"- {candidatePath}")
+				);
+				return true;
+			}
+		}
+
+		resolvedPath = string.Empty;
+		attemptedPaths = string.Join(
+			Environment.NewLine,
+			candidates.Select(static candidatePath => $"- {candidatePath}")
+		);
+		return false;
+	}
+
+	private static IEnumerable<string> EnumerateSelfAndParents(string startPath, int maxDepth) {
+		DirectoryInfo? directory;
+		try {
+			directory = new DirectoryInfo(startPath);
+		} catch (Exception) {
+			yield break;
+		}
+
+		int depth = 0;
+		while (directory is not null && depth <= maxDepth) {
+			yield return directory.FullName;
+			directory = directory.Parent;
+			depth++;
+		}
 	}
 
 	private static bool TryCompileShader(
@@ -331,6 +910,13 @@ public sealed class OpenGlGraphicsDevice : IGraphicsDevice, IOpenGlNativeAccess 
 	}
 
 	private readonly record struct ReflectedUniform(ActiveUniformType Type, int ArrayLength);
+
+	private readonly record struct TextureFormatSpec(
+		PixelInternalFormat InternalFormat,
+		PixelFormat PixelFormat,
+		PixelType PixelType,
+		int BytesPerPixel
+	);
 
 	private sealed class OpenGlUniformUploader : IUniformUploader {
 		private readonly int _program;

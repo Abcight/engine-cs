@@ -54,7 +54,6 @@ public sealed class Shader<TBinding> : IDisposable
 		}
 
 		_disposed = true;
-		GC.SuppressFinalize(this);
 		return Unit.Value;
 	}
 }

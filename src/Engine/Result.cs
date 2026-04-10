@@ -32,11 +32,15 @@ public abstract record Result<T, E> {
 	}
 
 	[MemberNotNullWhen(true, nameof(OkVariant))]
+	[MemberNotNullWhen(true, nameof(Value))]
 	[MemberNotNullWhen(false, nameof(ErrVariant))]
+	[MemberNotNullWhen(false, nameof(Error))]
 	public bool IsOk => this is Ok;
 
 	[MemberNotNullWhen(true, nameof(ErrVariant))]
+	[MemberNotNullWhen(true, nameof(Error))]
 	[MemberNotNullWhen(false, nameof(OkVariant))]
+	[MemberNotNullWhen(false, nameof(Value))]
 	public bool IsErr => this is Err;
 
 	public Ok? OkVariant => this as Ok;
@@ -94,8 +98,11 @@ public abstract record Result<E> {
 	}
 
 	[MemberNotNullWhen(true, nameof(ErrVariant))]
+	[MemberNotNullWhen(true, nameof(Error))]
 	public bool IsErr => this is Err;
 
+	[MemberNotNullWhen(false, nameof(ErrVariant))]
+	[MemberNotNullWhen(false, nameof(Error))]
 	public bool IsOk => this is Ok;
 
 	public Err? ErrVariant => this as Err;

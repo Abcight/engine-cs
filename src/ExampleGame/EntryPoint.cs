@@ -1,5 +1,4 @@
 using System.Numerics;
-using System.Runtime.InteropServices;
 using Engine;
 using Engine.Graphics.Contexts;
 using Engine.Graphics.Rendering;
@@ -137,7 +136,6 @@ internal sealed partial class RainbowTriangleApp {
 	}
 
 	[VertexLayout]
-	[StructLayout(LayoutKind.Sequential)]
 	private readonly partial struct RainbowVertex {
 		[VertexElement(0)] public readonly Vector3 Position;
 		[VertexElement(1)] public readonly Vector3 Color;

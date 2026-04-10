@@ -9,6 +9,21 @@
 
   <ItemGroup>
     <ProjectReference Include="../Engine/Engine.csproj" />
+    <Analyzer Include="..\Engine.ShaderGen\bin\$(Configuration)\netstandard2.0\Engine.ShaderGen.dll" />
+  </ItemGroup>
+
+  <Target Name="BuildShaderGenerator"
+          BeforeTargets="CoreCompile"
+          Condition="'$(DesignTimeBuild)' != 'true'">
+    <MSBuild Projects="..\Engine.ShaderGen\Engine.ShaderGen.csproj"
+             Targets="Build"
+             Properties="Configuration=$(Configuration)" />
+  </Target>
+
+  <ItemGroup>
+    <Content Include="res/shaders/**/*.glsl">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
   </ItemGroup>
 
 </Project>

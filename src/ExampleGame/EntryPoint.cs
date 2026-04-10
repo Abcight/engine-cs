@@ -1,2 +1,6 @@
-﻿// See https://aka.ms/new-console-template for more information
-Console.WriteLine("Hello, World!");
+﻿using ExampleGame;
+
+DemoShaderBinding binding = new();
+binding.MyShaderProperty = 0.5f;
+
+Console.WriteLine($"Generated shader binding test. MyShaderProperty={binding.MyShaderProperty}");

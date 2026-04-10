@@ -2,35 +2,26 @@ using Engine.Graphics.Shaders;
 
 namespace Engine.Graphics.Resources;
 
-public sealed class IndexBuffer<TIndex> : IDisposable
+public abstract class IndexBuffer<TIndex> : IDisposable
 	where TIndex : unmanaged {
-	internal delegate Result<Unit, GraphicsError> SetDataAction(ReadOnlySpan<TIndex> indices);
-	private readonly Func<IRenderPassContext, Result<Unit, GraphicsError>> _bindAction;
-	private readonly SetDataAction _setDataAction;
-	private readonly Func<Result<Unit, GraphicsError>> _disposeAction;
+
 	private bool _disposed;
 
-	internal IndexBuffer(
-		int indexCount,
-		int elementSizeInBytes,
-		IndexElementType elementType,
-		Func<IRenderPassContext, Result<Unit, GraphicsError>> bindAction,
-		SetDataAction setDataAction,
-		Func<Result<Unit, GraphicsError>> disposeAction
-	) {
+	protected IndexBuffer(int indexCount, int elementSizeInBytes, IndexElementType elementType) {
 		IndexCount = indexCount;
 		ElementSizeInBytes = elementSizeInBytes;
 		ElementType = elementType;
-		_bindAction = bindAction;
-		_setDataAction = setDataAction;
-		_disposeAction = disposeAction;
 	}
 
-	public int IndexCount { get; private set; }
+	public int IndexCount { get; protected set; }
 
 	public IndexElementType ElementType { get; }
 
 	internal int ElementSizeInBytes { get; }
+
+	protected abstract Result<Unit, GraphicsError> BindCore(IRenderPassContext context);
+	protected abstract Result<Unit, GraphicsError> SetDataCore(ReadOnlySpan<TIndex> indices);
+	protected abstract Result<Unit, GraphicsError> DisposeCore();
 
 	public Result<Unit, GraphicsError> Bind(IRenderPassContext? context) {
 		if (_disposed) {
@@ -42,7 +33,7 @@ public sealed class IndexBuffer<TIndex> : IDisposable
 		}
 
 		try {
-			return _bindAction(context);
+			return BindCore(context);
 		} catch (Exception exception) {
 			return GraphicsError.Unexpected($"Unexpected error while binding index buffer: {exception.Message}");
 		}
@@ -54,7 +45,7 @@ public sealed class IndexBuffer<TIndex> : IDisposable
 		}
 
 		try {
-			Result<Unit, GraphicsError> result = _setDataAction(indices);
+			Result<Unit, GraphicsError> result = SetDataCore(indices);
 			if (result.IsOk) {
 				IndexCount = indices.Length;
 			}
@@ -75,7 +66,7 @@ public sealed class IndexBuffer<TIndex> : IDisposable
 		}
 
 		try {
-			Result<Unit, GraphicsError> disposeResult = _disposeAction();
+			Result<Unit, GraphicsError> disposeResult = DisposeCore();
 			if (disposeResult.IsErr) {
 				return disposeResult;
 			}

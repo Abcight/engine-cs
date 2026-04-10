@@ -59,52 +59,9 @@ public sealed class OpenGlGraphicsDevice : IGraphicsDevice, IOpenGlNativeAccess 
 			UploadBufferData(BufferTarget.ArrayBuffer, vertices, usageHint);
 			TrySetObjectLabel(ObjectLabelIdentifier.Buffer, handle, label);
 
-			var buffer = new VertexBuffer<TVertex>(
-				vertexCount: vertices.Length,
-				strideBytes: Marshal.SizeOf<TVertex>(),
-				bindAction: context => {
-					if (!TryGetCompatibleContext(context, this, out _, out GraphicsError contextError)) {
-						return contextError;
-					}
-
-					try {
-						if (!GL.IsBuffer(handle)) {
-							return GraphicsError.InvalidState("Cannot bind a deleted vertex buffer.");
-						}
-
-						GL.BindBuffer(BufferTarget.ArrayBuffer, handle);
-						return Unit.Value;
-					} catch (Exception exception) {
-						return GraphicsError.BackendFailure($"Failed to bind vertex buffer: {exception.Message}");
-					}
-				},
-				setDataAction: data => {
-					try {
-						if (!GL.IsBuffer(handle)) {
-							return GraphicsError.InvalidState("Cannot update a deleted vertex buffer.");
-						}
-
-						GL.BindBuffer(BufferTarget.ArrayBuffer, handle);
-						UploadBufferData(BufferTarget.ArrayBuffer, data, usageHint);
-						return Unit.Value;
-					} catch (Exception exception) {
-						return GraphicsError.BackendFailure($"Failed to update vertex buffer: {exception.Message}");
-					}
-				},
-				disposeAction: () => {
-					try {
-						if (GL.IsBuffer(handle)) {
-							GL.DeleteBuffer(handle);
-						}
-
-						return Unit.Value;
-					} catch (Exception exception) {
-						return GraphicsError.BackendFailure($"Failed to dispose vertex buffer: {exception.Message}");
-					}
-				}
+			return new OpenGlVertexBuffer<TVertex>(
+				this, handle, vertices.Length, Marshal.SizeOf<TVertex>(), usageHint
 			);
-
-			return buffer;
 		} catch (Exception exception) {
 			try {
 				if (handle != 0 && GL.IsBuffer(handle)) {
@@ -145,53 +102,9 @@ public sealed class OpenGlGraphicsDevice : IGraphicsDevice, IOpenGlNativeAccess 
 			UploadBufferData(BufferTarget.ElementArrayBuffer, indices, usageHint);
 			TrySetObjectLabel(ObjectLabelIdentifier.Buffer, handle, label);
 
-			var buffer = new IndexBuffer<TIndex>(
-				indexCount: indices.Length,
-				elementSizeInBytes: elementSizeInBytes,
-				elementType: indexElementType,
-				bindAction: context => {
-					if (!TryGetCompatibleContext(context, this, out _, out GraphicsError contextError)) {
-						return contextError;
-					}
-
-					try {
-						if (!GL.IsBuffer(handle)) {
-							return GraphicsError.InvalidState("Cannot bind a deleted index buffer.");
-						}
-
-						GL.BindBuffer(BufferTarget.ElementArrayBuffer, handle);
-						return Unit.Value;
-					} catch (Exception exception) {
-						return GraphicsError.BackendFailure($"Failed to bind index buffer: {exception.Message}");
-					}
-				},
-				setDataAction: data => {
-					try {
-						if (!GL.IsBuffer(handle)) {
-							return GraphicsError.InvalidState("Cannot update a deleted index buffer.");
-						}
-
-						GL.BindBuffer(BufferTarget.ElementArrayBuffer, handle);
-						UploadBufferData(BufferTarget.ElementArrayBuffer, data, usageHint);
-						return Unit.Value;
-					} catch (Exception exception) {
-						return GraphicsError.BackendFailure($"Failed to update index buffer: {exception.Message}");
-					}
-				},
-				disposeAction: () => {
-					try {
-						if (GL.IsBuffer(handle)) {
-							GL.DeleteBuffer(handle);
-						}
-
-						return Unit.Value;
-					} catch (Exception exception) {
-						return GraphicsError.BackendFailure($"Failed to dispose index buffer: {exception.Message}");
-					}
-				}
+			return new OpenGlIndexBuffer<TIndex>(
+				this, handle, indices.Length, elementSizeInBytes, indexElementType, usageHint
 			);
-
-			return buffer;
 		} catch (Exception exception) {
 			try {
 				if (handle != 0 && GL.IsBuffer(handle)) {
@@ -277,78 +190,7 @@ public sealed class OpenGlGraphicsDevice : IGraphicsDevice, IOpenGlNativeAccess 
 
 			TrySetObjectLabel(ObjectLabelIdentifier.Texture, handle, label);
 
-			var texture = new Texture2D(
-				descriptor,
-				bindAction: (context, textureUnit) => {
-					if (!TryGetCompatibleContext(context, this, out _, out GraphicsError contextError)) {
-						return contextError;
-					}
-
-					if (textureUnit < 0) {
-						return GraphicsError.InvalidArgument("Texture unit cannot be negative.");
-					}
-
-					try {
-						if (!GL.IsTexture(handle)) {
-							return GraphicsError.InvalidState("Cannot bind a deleted texture.");
-						}
-
-						GL.ActiveTexture(TextureUnit.Texture0 + textureUnit);
-						GL.BindTexture(TextureTarget.Texture2D, handle);
-						return Unit.Value;
-					} catch (Exception exception) {
-						return GraphicsError.BackendFailure($"Failed to bind texture: {exception.Message}");
-					}
-				},
-				setPixelsAction: updatedPixels => {
-					if (updatedPixels.Length != expectedByteCount) {
-						return GraphicsError.InvalidArgument(
-							$"Texture update byte count mismatch. Expected {expectedByteCount} bytes, got {updatedPixels.Length}."
-						);
-					}
-
-					try {
-						if (!GL.IsTexture(handle)) {
-							return GraphicsError.InvalidState("Cannot update a deleted texture.");
-						}
-
-						byte[] pixelBytes = updatedPixels.ToArray();
-						GL.BindTexture(TextureTarget.Texture2D, handle);
-						GL.TexSubImage2D(
-							TextureTarget.Texture2D,
-							0,
-							0,
-							0,
-							descriptor.Width,
-							descriptor.Height,
-							formatSpec.PixelFormat,
-							formatSpec.PixelType,
-							pixelBytes
-						);
-
-						if (descriptor.GenerateMipmaps) {
-							GL.GenerateMipmap(GenerateMipmapTarget.Texture2D);
-						}
-
-						return Unit.Value;
-					} catch (Exception exception) {
-						return GraphicsError.BackendFailure($"Failed to update texture pixels: {exception.Message}");
-					}
-				},
-				disposeAction: () => {
-					try {
-						if (GL.IsTexture(handle)) {
-							GL.DeleteTexture(handle);
-						}
-
-						return Unit.Value;
-					} catch (Exception exception) {
-						return GraphicsError.BackendFailure($"Failed to dispose texture: {exception.Message}");
-					}
-				}
-			);
-
-			return texture;
+			return new OpenGlTexture2D(this, handle, descriptor, formatSpec, expectedByteCount);
 		} catch (Exception exception) {
 			try {
 				if (handle != 0 && GL.IsTexture(handle)) {
@@ -438,33 +280,7 @@ public sealed class OpenGlGraphicsDevice : IGraphicsDevice, IOpenGlNativeAccess 
 			}
 
 			var uploader = new OpenGlUniformUploader(program, reflectedUniforms);
-			var shader = new Shader<TBinding>(
-				binding,
-				(context, inner) => {
-					if (!TryGetCompatibleContext(context, this, out _, out GraphicsError contextError)) {
-						return contextError;
-					}
-
-					try {
-						GL.UseProgram(program);
-						inner.Upload(uploader);
-						return Unit.Value;
-					} catch (Exception exception) {
-						return GraphicsError.BackendFailure($"Failed to bind shader: {exception.Message}");
-					}
-				},
-				() => {
-					try {
-						if (GL.IsProgram(program)) {
-							GL.DeleteProgram(program);
-						}
-
-						return Unit.Value;
-					} catch (Exception exception) {
-						return GraphicsError.BackendFailure($"Failed to dispose shader program: {exception.Message}");
-					}
-				}
-			);
+			var shader = new OpenGlShader<TBinding>(this, program, uploader, binding);
 
 			return new ShaderLoadSuccess<TBinding>(shader, warnings);
 		} catch (Exception exception) {
@@ -532,7 +348,7 @@ public sealed class OpenGlGraphicsDevice : IGraphicsDevice, IOpenGlNativeAccess 
 		}
 	}
 
-	private static bool TryGetCompatibleContext(
+	internal static bool TryGetCompatibleContext(
 		IRenderPassContext context,
 		OpenGlGraphicsDevice owner,
 		out OpenGlRenderPassContext? openGlContext,
@@ -591,7 +407,7 @@ public sealed class OpenGlGraphicsDevice : IGraphicsDevice, IOpenGlNativeAccess 
 		};
 	}
 
-	private static bool TryGetTextureFormatSpec(TextureFormat format, out TextureFormatSpec spec) {
+	internal static bool TryGetTextureFormatSpec(TextureFormat format, out TextureFormatSpec spec) {
 		spec = format switch {
 			TextureFormat.R8 => new TextureFormatSpec(PixelInternalFormat.R8, PixelFormat.Red, PixelType.UnsignedByte, 1),
 			TextureFormat.RG8 => new TextureFormatSpec(PixelInternalFormat.Rg8, PixelFormat.Rg, PixelType.UnsignedByte, 2),
@@ -647,7 +463,7 @@ public sealed class OpenGlGraphicsDevice : IGraphicsDevice, IOpenGlNativeAccess 
 		return false;
 	}
 
-	private static void UploadBufferData<T>(
+	internal static void UploadBufferData<T>(
 		BufferTarget target,
 		ReadOnlySpan<T> data,
 		BufferUsageHint usageHint
@@ -911,7 +727,7 @@ public sealed class OpenGlGraphicsDevice : IGraphicsDevice, IOpenGlNativeAccess 
 
 	private readonly record struct ReflectedUniform(ActiveUniformType Type, int ArrayLength);
 
-	private readonly record struct TextureFormatSpec(
+	internal readonly record struct TextureFormatSpec(
 		PixelInternalFormat InternalFormat,
 		PixelFormat PixelFormat,
 		PixelType PixelType,

@@ -1,23 +1,18 @@
 namespace Engine.Graphics.Shaders;
 
-public sealed class Shader<TBinding> : IDisposable
+public abstract class Shader<TBinding> : IDisposable
 	where TBinding : class, IGeneratedShaderBinding {
 
-	private readonly Func<IRenderPassContext, TBinding, Result<Unit, GraphicsError>> _bindAction;
-	private readonly Func<Result<Unit, GraphicsError>> _disposeAction;
 	private bool _disposed;
 
-	internal Shader(
-		TBinding inner,
-		Func<IRenderPassContext, TBinding, Result<Unit, GraphicsError>> bindAction,
-		Func<Result<Unit, GraphicsError>> disposeAction
-	) {
+	protected Shader(TBinding inner) {
 		Inner = inner;
-		_bindAction = bindAction;
-		_disposeAction = disposeAction;
 	}
 
 	public TBinding Inner { get; }
+
+	protected abstract Result<Unit, GraphicsError> BindCore(IRenderPassContext context);
+	protected abstract Result<Unit, GraphicsError> DisposeCore();
 
 	public Result<Unit, GraphicsError> Bind(IRenderPassContext? context) {
 		if (_disposed) {
@@ -29,7 +24,7 @@ public sealed class Shader<TBinding> : IDisposable
 		}
 
 		try {
-			return _bindAction(context, Inner);
+			return BindCore(context);
 		} catch (Exception exception) {
 			return GraphicsError.Unexpected($"Unexpected error while binding shader: {exception.Message}");
 		}
@@ -45,7 +40,7 @@ public sealed class Shader<TBinding> : IDisposable
 		}
 
 		try {
-			Result<Unit, GraphicsError> disposeResult = _disposeAction();
+			Result<Unit, GraphicsError> disposeResult = DisposeCore();
 			if (disposeResult.IsErr) {
 				return disposeResult;
 			}

@@ -2,33 +2,23 @@ using Engine.Graphics.Shaders;
 
 namespace Engine.Graphics.Resources;
 
-public sealed class VertexBuffer<TVertex> : IDisposable
+public abstract class VertexBuffer<TVertex> : IDisposable
 	where TVertex : unmanaged {
 
-	internal delegate Result<Unit, GraphicsError> SetDataAction(ReadOnlySpan<TVertex> vertices);
-
-	private readonly Func<IRenderPassContext, Result<Unit, GraphicsError>> _bindAction;
-	private readonly SetDataAction _setDataAction;
-	private readonly Func<Result<Unit, GraphicsError>> _disposeAction;
 	private bool _disposed;
 
-	internal VertexBuffer(
-		int vertexCount,
-		int strideBytes,
-		Func<IRenderPassContext, Result<Unit, GraphicsError>> bindAction,
-		SetDataAction setDataAction,
-		Func<Result<Unit, GraphicsError>> disposeAction
-	) {
+	protected VertexBuffer(int vertexCount, int strideBytes) {
 		VertexCount = vertexCount;
 		StrideBytes = strideBytes;
-		_bindAction = bindAction;
-		_setDataAction = setDataAction;
-		_disposeAction = disposeAction;
 	}
 
-	public int VertexCount { get; private set; }
+	public int VertexCount { get; protected set; }
 
 	public int StrideBytes { get; }
+
+	protected abstract Result<Unit, GraphicsError> BindCore(IRenderPassContext context);
+	protected abstract Result<Unit, GraphicsError> SetDataCore(ReadOnlySpan<TVertex> vertices);
+	protected abstract Result<Unit, GraphicsError> DisposeCore();
 
 	public Result<Unit, GraphicsError> Bind(IRenderPassContext? context) {
 		if (_disposed) {
@@ -40,7 +30,7 @@ public sealed class VertexBuffer<TVertex> : IDisposable
 		}
 
 		try {
-			return _bindAction(context);
+			return BindCore(context);
 		} catch (Exception exception) {
 			return GraphicsError.Unexpected($"Unexpected error while binding vertex buffer: {exception.Message}");
 		}
@@ -52,7 +42,7 @@ public sealed class VertexBuffer<TVertex> : IDisposable
 		}
 
 		try {
-			Result<Unit, GraphicsError> result = _setDataAction(vertices);
+			Result<Unit, GraphicsError> result = SetDataCore(vertices);
 			if (result.IsOk) {
 				VertexCount = vertices.Length;
 			}
@@ -73,7 +63,7 @@ public sealed class VertexBuffer<TVertex> : IDisposable
 		}
 
 		try {
-			Result<Unit, GraphicsError> disposeResult = _disposeAction();
+			Result<Unit, GraphicsError> disposeResult = DisposeCore();
 			if (disposeResult.IsErr) {
 				return disposeResult;
 			}

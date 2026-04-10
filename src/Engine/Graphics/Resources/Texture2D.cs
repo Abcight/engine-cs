@@ -2,24 +2,12 @@ using Engine.Graphics.Shaders;
 
 namespace Engine.Graphics.Resources;
 
-public sealed class Texture2D : IDisposable {
-	internal delegate Result<Unit, GraphicsError> SetPixelsAction(ReadOnlySpan<byte> pixels);
+public abstract class Texture2D : IDisposable {
 
-	private readonly Func<IRenderPassContext, int, Result<Unit, GraphicsError>> _bindAction;
-	private readonly SetPixelsAction _setPixelsAction;
-	private readonly Func<Result<Unit, GraphicsError>> _disposeAction;
 	private bool _disposed;
 
-	internal Texture2D(
-		Texture2DDescriptor descriptor,
-		Func<IRenderPassContext, int, Result<Unit, GraphicsError>> bindAction,
-		SetPixelsAction setPixelsAction,
-		Func<Result<Unit, GraphicsError>> disposeAction
-	) {
+	protected Texture2D(Texture2DDescriptor descriptor) {
 		Descriptor = descriptor;
-		_bindAction = bindAction;
-		_setPixelsAction = setPixelsAction;
-		_disposeAction = disposeAction;
 	}
 
 	public Texture2DDescriptor Descriptor { get; }
@@ -29,6 +17,10 @@ public sealed class Texture2D : IDisposable {
 	public int Height => Descriptor.Height;
 
 	public TextureFormat Format => Descriptor.Format;
+
+	protected abstract Result<Unit, GraphicsError> BindCore(IRenderPassContext context, int textureUnit);
+	protected abstract Result<Unit, GraphicsError> SetPixelsCore(ReadOnlySpan<byte> pixels);
+	protected abstract Result<Unit, GraphicsError> DisposeCore();
 
 	public Result<Unit, GraphicsError> Bind(IRenderPassContext? context, int textureUnit = 0) {
 		if (_disposed) {
@@ -44,7 +36,7 @@ public sealed class Texture2D : IDisposable {
 		}
 
 		try {
-			return _bindAction(context, textureUnit);
+			return BindCore(context, textureUnit);
 		} catch (Exception exception) {
 			return GraphicsError.Unexpected($"Unexpected error while binding texture: {exception.Message}");
 		}
@@ -56,7 +48,7 @@ public sealed class Texture2D : IDisposable {
 		}
 
 		try {
-			return _setPixelsAction(pixels);
+			return SetPixelsCore(pixels);
 		} catch (Exception exception) {
 			return GraphicsError.Unexpected($"Unexpected error while updating texture: {exception.Message}");
 		}
@@ -72,7 +64,7 @@ public sealed class Texture2D : IDisposable {
 		}
 
 		try {
-			Result<Unit, GraphicsError> disposeResult = _disposeAction();
+			Result<Unit, GraphicsError> disposeResult = DisposeCore();
 			if (disposeResult.IsErr) {
 				return disposeResult;
 			}

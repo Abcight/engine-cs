@@ -227,50 +227,12 @@ internal sealed class OpenGlRenderTargetContext : IRenderTargetContext {
 		int textureHandle,
 		Texture2DDescriptor descriptor
 	) {
-		return new Texture2D(
-			descriptor,
-			bindAction: (context, textureUnit) => {
-				if (context is null) {
-					return GraphicsError.InvalidArgument("Render pass context cannot be null.");
-				}
+		if (!OpenGlGraphicsDevice.TryGetTextureFormatSpec(descriptor.Format, out var formatSpec)) {
+			formatSpec = default;
+		}
 
-				if (context.Device is not OpenGlGraphicsDevice openGlDevice || !ReferenceEquals(openGlDevice, device)) {
-					return GraphicsError.InvalidContext(
-						"Cannot bind a texture created for a different graphics device/backend."
-					);
-				}
-
-				if (textureUnit < 0) {
-					return GraphicsError.InvalidArgument("Texture unit cannot be negative.");
-				}
-
-				try {
-					if (!GL.IsTexture(textureHandle)) {
-						return GraphicsError.InvalidState("Cannot bind a deleted texture.");
-					}
-
-					GL.ActiveTexture(TextureUnit.Texture0 + textureUnit);
-					GL.BindTexture(TextureTarget.Texture2D, textureHandle);
-					return Unit.Value;
-				} catch (Exception exception) {
-					return GraphicsError.BackendFailure($"Failed to bind render target texture: {exception.Message}");
-				}
-			},
-			setPixelsAction: _ => GraphicsError.Unsupported(
-				"Render target attachment textures cannot be updated via SetPixels."
-			),
-			disposeAction: () => {
-				try {
-					if (GL.IsTexture(textureHandle)) {
-						GL.DeleteTexture(textureHandle);
-					}
-
-					return Unit.Value;
-				} catch (Exception exception) {
-					return GraphicsError.BackendFailure($"Failed to dispose render target texture: {exception.Message}");
-				}
-			}
-		);
+		int expectedByteCount = descriptor.Width * descriptor.Height * formatSpec.BytesPerPixel;
+		return new OpenGlTexture2D(device, textureHandle, descriptor, formatSpec, expectedByteCount, isRenderTarget: true);
 	}
 
 	private static bool TryMapColorFormat(

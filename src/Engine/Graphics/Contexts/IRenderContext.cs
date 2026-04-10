@@ -7,5 +7,5 @@ public interface IRenderContext : IDisposable {
 	int Width { get; }
 	int Height { get; }
 	Result<IRenderPassContext, GraphicsError> BeginRenderPass(string? label = null);
-	Result<Unit, GraphicsError> Present();
+	Result<GraphicsError> Present();
 }

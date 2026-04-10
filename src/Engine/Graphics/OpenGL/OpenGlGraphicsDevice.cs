@@ -331,7 +331,7 @@ public sealed class OpenGlGraphicsDevice : IGraphicsDevice, IOpenGlNativeAccess 
 		_disposed = true;
 	}
 
-	private Result<Unit, GraphicsError> EnsureDefaultVertexArray() {
+	private Result<GraphicsError> EnsureDefaultVertexArray() {
 		if (_defaultVertexArray != 0) {
 			return Unit.Value;
 		}

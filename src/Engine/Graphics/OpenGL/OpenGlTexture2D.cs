@@ -27,7 +27,7 @@ internal sealed class OpenGlTexture2D : Texture2D {
 		_isRenderTarget = isRenderTarget;
 	}
 
-	protected override Result<Unit, GraphicsError> BindCore(IRenderPassContext context, int textureUnit) {
+	protected override Result<GraphicsError> BindCore(IRenderPassContext context, int textureUnit) {
 		if (!OpenGlGraphicsDevice.TryGetCompatibleContext(context, _device, out _, out GraphicsError contextError)) {
 			return contextError;
 		}
@@ -41,7 +41,7 @@ internal sealed class OpenGlTexture2D : Texture2D {
 		return Unit.Value;
 	}
 
-	protected override Result<Unit, GraphicsError> SetPixelsCore(ReadOnlySpan<byte> pixels) {
+	protected override Result<GraphicsError> SetPixelsCore(ReadOnlySpan<byte> pixels) {
 		if (_isRenderTarget) {
 			return GraphicsError.Unsupported("Render target attachment textures cannot be updated via SetPixels.");
 		}
@@ -77,7 +77,7 @@ internal sealed class OpenGlTexture2D : Texture2D {
 		return Unit.Value;
 	}
 
-	protected override Result<Unit, GraphicsError> DisposeCore() {
+	protected override Result<GraphicsError> DisposeCore() {
 		if (GL.IsTexture(_handle)) {
 			GL.DeleteTexture(_handle);
 		}

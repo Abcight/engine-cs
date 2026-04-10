@@ -40,7 +40,7 @@ internal sealed class OpenGlWindowRenderContext : IWindowRenderContext {
 
 	public int Height => _window.ClientSize.Y;
 
-	public Result<Unit, GraphicsError> Run(WindowRenderCallbacks callbacks) {
+	public Result<GraphicsError> Run(WindowRenderCallbacks callbacks) {
 		if (_disposed) {
 			return GraphicsError.DeviceDisposed("Cannot run a disposed window render context.");
 		}
@@ -88,7 +88,7 @@ internal sealed class OpenGlWindowRenderContext : IWindowRenderContext {
 		return _device.BeginRenderPass(label);
 	}
 
-	public Result<Unit, GraphicsError> Present() {
+	public Result<GraphicsError> Present() {
 		if (_disposed) {
 			return GraphicsError.DeviceDisposed("Cannot present a disposed window context.");
 		}
@@ -167,7 +167,7 @@ internal sealed class OpenGlWindowRenderContext : IWindowRenderContext {
 	}
 
 	private void InvokeCallback(
-		Func<IWindowRenderContext, Result<Unit, GraphicsError>>? callback,
+		Func<IWindowRenderContext, Result<GraphicsError>>? callback,
 		string stage
 	) {
 		if (callback is null) {
@@ -175,7 +175,7 @@ internal sealed class OpenGlWindowRenderContext : IWindowRenderContext {
 		}
 
 		try {
-			Result<Unit, GraphicsError> result = callback(this);
+			Result<GraphicsError> result = callback(this);
 			if (result.TryErr() is { Error: var error }) {
 				SetRuntimeError(new GraphicsError(
 					error.Code,

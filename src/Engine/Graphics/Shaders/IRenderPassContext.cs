@@ -8,33 +8,33 @@ namespace Engine.Graphics.Shaders;
 public interface IRenderPassContext : IDisposable {
 	IGraphicsDevice Device { get; }
 
-	Result<Unit, GraphicsError> BindShader<TBinding>(Shader<TBinding> shader)
+	Result<GraphicsError> BindShader<TBinding>(Shader<TBinding> shader)
 		where TBinding : class, IGeneratedShaderBinding;
 
-	Result<Unit, GraphicsError> BindVertexBuffer<TVertex>(VertexBuffer<TVertex> buffer)
+	Result<GraphicsError> BindVertexBuffer<TVertex>(VertexBuffer<TVertex> buffer)
 		where TVertex : unmanaged;
 
-	Result<Unit, GraphicsError> BindIndexBuffer<TIndex>(IndexBuffer<TIndex> buffer)
+	Result<GraphicsError> BindIndexBuffer<TIndex>(IndexBuffer<TIndex> buffer)
 		where TIndex : unmanaged;
 
-	Result<Unit, GraphicsError> BindTexture2D(Texture2D texture, int textureUnit = 0);
+	Result<GraphicsError> BindTexture2D(Texture2D texture, int textureUnit = 0);
 
-	Result<Unit, GraphicsError> SetVertexLayout(VertexLayoutDescription layout);
+	Result<GraphicsError> SetVertexLayout(VertexLayoutDescription layout);
 
-	Result<Unit, GraphicsError> Clear(
+	Result<GraphicsError> Clear(
 		ClearTargets targets,
 		Vector4 color,
 		float depth = 1.0f,
 		int stencil = 0
 	);
 
-	Result<Unit, GraphicsError> DrawArrays(
+	Result<GraphicsError> DrawArrays(
 		PrimitiveTopology topology,
 		int vertexCount,
 		int firstVertex = 0
 	);
 
-	Result<Unit, GraphicsError> DrawIndexed(
+	Result<GraphicsError> DrawIndexed(
 		PrimitiveTopology topology,
 		int indexCount,
 		int firstIndex = 0,

@@ -25,7 +25,7 @@ public sealed class OpenGlRenderPassContext : IRenderPassContext {
 
 	internal bool IsDisposed => _disposed;
 
-	public Result<Unit, GraphicsError> BindShader<TBinding>(Shader<TBinding> shader)
+	public Result<GraphicsError> BindShader<TBinding>(Shader<TBinding> shader)
 		where TBinding : class, IGeneratedShaderBinding {
 		if (_disposed) {
 			return GraphicsError.DeviceDisposed("Cannot bind shader on a disposed render pass context.");
@@ -38,7 +38,7 @@ public sealed class OpenGlRenderPassContext : IRenderPassContext {
 		return shader.Bind(this);
 	}
 
-	public Result<Unit, GraphicsError> BindVertexBuffer<TVertex>(VertexBuffer<TVertex> buffer)
+	public Result<GraphicsError> BindVertexBuffer<TVertex>(VertexBuffer<TVertex> buffer)
 		where TVertex : unmanaged {
 		if (_disposed) {
 			return GraphicsError.DeviceDisposed("Cannot bind vertex buffer on a disposed render pass context.");
@@ -51,7 +51,7 @@ public sealed class OpenGlRenderPassContext : IRenderPassContext {
 		return buffer.Bind(this);
 	}
 
-	public Result<Unit, GraphicsError> BindIndexBuffer<TIndex>(IndexBuffer<TIndex> buffer)
+	public Result<GraphicsError> BindIndexBuffer<TIndex>(IndexBuffer<TIndex> buffer)
 		where TIndex : unmanaged {
 		if (_disposed) {
 			return GraphicsError.DeviceDisposed("Cannot bind index buffer on a disposed render pass context.");
@@ -61,7 +61,7 @@ public sealed class OpenGlRenderPassContext : IRenderPassContext {
 			return GraphicsError.InvalidArgument("Index buffer cannot be null.");
 		}
 
-		Result<Unit, GraphicsError> bindResult = buffer.Bind(this);
+		Result<GraphicsError> bindResult = buffer.Bind(this);
 		if (bindResult.IsErr) {
 			return bindResult;
 		}
@@ -71,7 +71,7 @@ public sealed class OpenGlRenderPassContext : IRenderPassContext {
 		return Unit.Value;
 	}
 
-	public Result<Unit, GraphicsError> BindTexture2D(Texture2D texture, int textureUnit = 0) {
+	public Result<GraphicsError> BindTexture2D(Texture2D texture, int textureUnit = 0) {
 		if (_disposed) {
 			return GraphicsError.DeviceDisposed("Cannot bind texture on a disposed render pass context.");
 		}
@@ -83,7 +83,7 @@ public sealed class OpenGlRenderPassContext : IRenderPassContext {
 		return texture.Bind(this, textureUnit);
 	}
 
-	public Result<Unit, GraphicsError> SetVertexLayout(VertexLayoutDescription layout) {
+	public Result<GraphicsError> SetVertexLayout(VertexLayoutDescription layout) {
 		if (_disposed) {
 			return GraphicsError.DeviceDisposed("Cannot set vertex layout on a disposed render pass context.");
 		}
@@ -156,7 +156,7 @@ public sealed class OpenGlRenderPassContext : IRenderPassContext {
 		}
 	}
 
-	public Result<Unit, GraphicsError> Clear(
+	public Result<GraphicsError> Clear(
 		ClearTargets targets,
 		Vector4 color,
 		float depth = 1.0f,
@@ -191,7 +191,7 @@ public sealed class OpenGlRenderPassContext : IRenderPassContext {
 		}
 	}
 
-	public Result<Unit, GraphicsError> DrawArrays(
+	public Result<GraphicsError> DrawArrays(
 		PrimitiveTopology topology,
 		int vertexCount,
 		int firstVertex = 0
@@ -220,7 +220,7 @@ public sealed class OpenGlRenderPassContext : IRenderPassContext {
 		}
 	}
 
-	public Result<Unit, GraphicsError> DrawIndexed(
+	public Result<GraphicsError> DrawIndexed(
 		PrimitiveTopology topology,
 		int indexCount,
 		int firstIndex = 0,

@@ -11,10 +11,10 @@ public abstract class Shader<TBinding> : IDisposable
 
 	public TBinding Inner { get; }
 
-	protected abstract Result<Unit, GraphicsError> BindCore(IRenderPassContext context);
-	protected abstract Result<Unit, GraphicsError> DisposeCore();
+	protected abstract Result<GraphicsError> BindCore(IRenderPassContext context);
+	protected abstract Result<GraphicsError> DisposeCore();
 
-	public Result<Unit, GraphicsError> Bind(IRenderPassContext? context) {
+	public Result<GraphicsError> Bind(IRenderPassContext? context) {
 		if (_disposed) {
 			return GraphicsError.DeviceDisposed("Cannot bind a disposed shader.");
 		}
@@ -34,13 +34,13 @@ public abstract class Shader<TBinding> : IDisposable
 		_ = DisposeChecked();
 	}
 
-	public Result<Unit, GraphicsError> DisposeChecked() {
+	public Result<GraphicsError> DisposeChecked() {
 		if (_disposed) {
 			return Unit.Value;
 		}
 
 		try {
-			Result<Unit, GraphicsError> disposeResult = DisposeCore();
+			Result<GraphicsError> disposeResult = DisposeCore();
 			if (disposeResult.IsErr) {
 				return disposeResult;
 			}

@@ -48,7 +48,7 @@ internal sealed partial class RainbowTriangleApp {
 	private VertexBuffer<RainbowVertex>? _vertexBuffer;
 	private IndexBuffer<uint>? _indexBuffer;
 
-	public Result<Unit, GraphicsError> OnLoad(IWindowRenderContext context) {
+	public Result<GraphicsError> OnLoad(IWindowRenderContext context) {
 		RainbowVertex[] vertices = [
 			new RainbowVertex( 0.0f,  0.65f, 0.0f, 1.0f, 0.0f, 0.0f),
 			new RainbowVertex( 0.7f, -0.55f, 0.0f, 0.0f, 1.0f, 0.0f),
@@ -97,7 +97,7 @@ internal sealed partial class RainbowTriangleApp {
 		return Unit.Value;
 	}
 
-	public Result<Unit, GraphicsError> OnRender(IWindowRenderContext context, double _) {
+	public Result<GraphicsError> OnRender(IWindowRenderContext context, double _) {
 		if (_shader is null || _vertexBuffer is null || _indexBuffer is null) {
 			return GraphicsError.InvalidState("Cannot render before graphics resources are created.");
 		}
@@ -124,11 +124,11 @@ internal sealed partial class RainbowTriangleApp {
 		return context.Present();
 	}
 
-	public Result<Unit, GraphicsError> OnResize(IWindowRenderContext _, int __, int ___) {
+	public Result<GraphicsError> OnResize(IWindowRenderContext _, int __, int ___) {
 		return Unit.Value;
 	}
 
-	public Result<Unit, GraphicsError> OnUnload(IWindowRenderContext _) {
+	public Result<GraphicsError> OnUnload(IWindowRenderContext _) {
 		_indexBuffer?.DisposeChecked();
 		_vertexBuffer?.DisposeChecked();
 		_shader?.DisposeChecked();

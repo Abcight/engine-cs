@@ -24,7 +24,7 @@ internal sealed class OpenGlVertexBuffer<TVertex> : VertexBuffer<TVertex>
 		_usageHint = usageHint;
 	}
 
-	protected override Result<Unit, GraphicsError> BindCore(IRenderPassContext context) {
+	protected override Result<GraphicsError> BindCore(IRenderPassContext context) {
 		if (!OpenGlGraphicsDevice.TryGetCompatibleContext(context, _device, out _, out GraphicsError contextError)) {
 			return contextError;
 		}
@@ -37,7 +37,7 @@ internal sealed class OpenGlVertexBuffer<TVertex> : VertexBuffer<TVertex>
 		return Unit.Value;
 	}
 
-	protected override Result<Unit, GraphicsError> SetDataCore(ReadOnlySpan<TVertex> vertices) {
+	protected override Result<GraphicsError> SetDataCore(ReadOnlySpan<TVertex> vertices) {
 		if (!GL.IsBuffer(_handle)) {
 			return GraphicsError.InvalidState("Cannot update a deleted vertex buffer.");
 		}
@@ -47,7 +47,7 @@ internal sealed class OpenGlVertexBuffer<TVertex> : VertexBuffer<TVertex>
 		return Unit.Value;
 	}
 
-	protected override Result<Unit, GraphicsError> DisposeCore() {
+	protected override Result<GraphicsError> DisposeCore() {
 		if (GL.IsBuffer(_handle)) {
 			GL.DeleteBuffer(_handle);
 		}

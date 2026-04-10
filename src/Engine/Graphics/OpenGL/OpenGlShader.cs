@@ -21,7 +21,7 @@ internal sealed class OpenGlShader<TBinding> : Shader<TBinding>
 		_uploader = uploader;
 	}
 
-	protected override Result<Unit, GraphicsError> BindCore(IRenderPassContext context) {
+	protected override Result<GraphicsError> BindCore(IRenderPassContext context) {
 		if (!OpenGlGraphicsDevice.TryGetCompatibleContext(context, _device, out _, out GraphicsError contextError)) {
 			return contextError;
 		}
@@ -31,7 +31,7 @@ internal sealed class OpenGlShader<TBinding> : Shader<TBinding>
 		return Unit.Value;
 	}
 
-	protected override Result<Unit, GraphicsError> DisposeCore() {
+	protected override Result<GraphicsError> DisposeCore() {
 		if (GL.IsProgram(_program)) {
 			GL.DeleteProgram(_program);
 		}

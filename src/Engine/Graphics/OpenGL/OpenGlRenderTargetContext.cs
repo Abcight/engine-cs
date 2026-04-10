@@ -190,7 +190,7 @@ internal sealed class OpenGlRenderTargetContext : IRenderTargetContext {
 		return _device.BeginRenderPass(label);
 	}
 
-	public Result<Unit, GraphicsError> Present() {
+	public Result<GraphicsError> Present() {
 		if (_disposed) {
 			return GraphicsError.DeviceDisposed("Cannot present a disposed render target context.");
 		}

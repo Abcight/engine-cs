@@ -18,11 +18,11 @@ public abstract class Texture2D : IDisposable {
 
 	public TextureFormat Format => Descriptor.Format;
 
-	protected abstract Result<Unit, GraphicsError> BindCore(IRenderPassContext context, int textureUnit);
-	protected abstract Result<Unit, GraphicsError> SetPixelsCore(ReadOnlySpan<byte> pixels);
-	protected abstract Result<Unit, GraphicsError> DisposeCore();
+	protected abstract Result<GraphicsError> BindCore(IRenderPassContext context, int textureUnit);
+	protected abstract Result<GraphicsError> SetPixelsCore(ReadOnlySpan<byte> pixels);
+	protected abstract Result<GraphicsError> DisposeCore();
 
-	public Result<Unit, GraphicsError> Bind(IRenderPassContext? context, int textureUnit = 0) {
+	public Result<GraphicsError> Bind(IRenderPassContext? context, int textureUnit = 0) {
 		if (_disposed) {
 			return GraphicsError.DeviceDisposed("Cannot bind a disposed texture.");
 		}
@@ -42,7 +42,7 @@ public abstract class Texture2D : IDisposable {
 		}
 	}
 
-	public Result<Unit, GraphicsError> SetPixels(ReadOnlySpan<byte> pixels) {
+	public Result<GraphicsError> SetPixels(ReadOnlySpan<byte> pixels) {
 		if (_disposed) {
 			return GraphicsError.DeviceDisposed("Cannot update a disposed texture.");
 		}
@@ -58,13 +58,13 @@ public abstract class Texture2D : IDisposable {
 		_ = DisposeChecked();
 	}
 
-	public Result<Unit, GraphicsError> DisposeChecked() {
+	public Result<GraphicsError> DisposeChecked() {
 		if (_disposed) {
 			return Unit.Value;
 		}
 
 		try {
-			Result<Unit, GraphicsError> disposeResult = DisposeCore();
+			Result<GraphicsError> disposeResult = DisposeCore();
 			if (disposeResult.IsErr) {
 				return disposeResult;
 			}

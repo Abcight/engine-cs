@@ -38,6 +38,44 @@ uniform bool _has_roughness_texture;
 uniform bool _has_occlusion_texture;
 uniform bool _has_emissive_texture;
 
+const float PI = 3.14159265359;
+
+float DistributionGGX(vec3 N, vec3 H, float roughness) {
+    float a = roughness * roughness;
+    float a2 = a * a;
+    float NdotH = max(dot(N, H), 0.0);
+    float NdotH2 = NdotH * NdotH;
+
+    float nom   = a2;
+    float denom = (NdotH2 * (a2 - 1.0) + 1.0);
+    denom = PI * denom * denom;
+
+    return nom / max(denom, 0.0000001);
+}
+
+float GeometrySchlickGGX(float NdotV, float roughness) {
+    float r = (roughness + 1.0);
+    float k = (r * r) / 8.0;
+
+    float nom   = NdotV;
+    float denom = NdotV * (1.0 - k) + k;
+
+    return nom / denom;
+}
+
+float GeometrySmith(vec3 N, vec3 V, vec3 L, float roughness) {
+    float NdotV = max(dot(N, V), 0.0);
+    float NdotL = max(dot(N, L), 0.0);
+    float ggx2 = GeometrySchlickGGX(NdotV, roughness);
+    float ggx1 = GeometrySchlickGGX(NdotL, roughness);
+
+    return ggx1 * ggx2;
+}
+
+vec3 FresnelSchlick(float cosTheta, vec3 F0) {
+    return F0 + (1.0 - F0) * pow(clamp(1.0 - cosTheta, 0.0, 1.0), 5.0);
+}
+
 vec3 EvaluateLight(
     vec3 lightDirection,
     vec3 lightColor,
@@ -47,21 +85,33 @@ vec3 EvaluateLight(
     float metallic,
     float roughness
 ) {
-    float ndotl = max(dot(normal, lightDirection), 0.0);
-    if (ndotl <= 0.0) {
+    vec3 L = lightDirection;
+    vec3 V = viewDirection;
+    vec3 N = normal;
+    vec3 H = normalize(V + L);
+
+    float NdotL = max(dot(N, L), 0.0);
+    if (NdotL <= 0.0) {
         return vec3(0.0);
     }
 
-    vec3 halfDirection = normalize(lightDirection + viewDirection);
-    float ndoth = max(dot(normal, halfDirection), 0.0);
-    float specularPower = mix(8.0, 128.0, 1.0 - roughness);
-    float specularTerm = pow(ndoth, specularPower) * ndotl;
+    vec3 F0 = mix(vec3(0.04), baseColor, metallic);
+    vec3 F = FresnelSchlick(max(dot(H, V), 0.0), F0);
 
-    vec3 diffuse = (1.0 - metallic) * baseColor * ndotl;
-    vec3 f0 = mix(vec3(0.04), baseColor, metallic);
-    vec3 specular = f0 * specularTerm;
+    float NDF = DistributionGGX(N, H, roughness);   
+    float G   = GeometrySmith(N, V, L, roughness);      
+    
+    vec3 numerator    = NDF * G * F; 
+    float denominator = 4.0 * max(dot(N, V), 0.0) * NdotL + 0.0001;
+    vec3 specular     = numerator / denominator;
+    
+    vec3 kS = F;
+    vec3 kD = vec3(1.0) - kS;
+    kD *= 1.0 - metallic;	  
 
-    return (diffuse + specular) * lightColor;
+    vec3 diffuse = kD * baseColor / PI;
+
+    return (diffuse + specular) * lightColor * NdotL;
 }
 
 void main() {
@@ -143,8 +193,6 @@ void main() {
     }
 
     vec3 color = lighting * occlusion + emissive;
-    float depthHint = clamp((vMvpDepth + 3.0) / 6.0, 0.85, 1.15);
-    color *= depthHint;
     color = color / (color + vec3(1.0));
     color = pow(color, vec3(1.0 / 2.2));
 

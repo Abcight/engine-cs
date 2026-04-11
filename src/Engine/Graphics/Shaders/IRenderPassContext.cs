@@ -23,6 +23,10 @@ public interface IRenderPassContext : IDisposable {
 
 	Result<GraphicsError> SetDepthTestEnabled(bool enabled);
 
+	Result<GraphicsError> SetDepthWriteEnabled(bool enabled);
+
+	Result<GraphicsError> SetCullMode(CullMode mode);
+
 	Result<GraphicsError> Clear(
 		ClearTargets targets,
 		Vector4 color,

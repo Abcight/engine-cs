@@ -175,6 +175,47 @@ public sealed class OpenGlRenderPassContext : IRenderPassContext {
 		}
 	}
 
+	public Result<GraphicsError> SetDepthWriteEnabled(bool enabled) {
+		if (_disposed) {
+			return GraphicsError.DeviceDisposed("Cannot change depth write state on a disposed render pass context.");
+		}
+
+		try {
+			GL.DepthMask(enabled);
+			return Unit.Value;
+		} catch (Exception exception) {
+			return GraphicsError.BackendFailure($"Failed to change depth write state: {exception.Message}");
+		}
+	}
+
+	public Result<GraphicsError> SetCullMode(CullMode mode) {
+		if (_disposed) {
+			return GraphicsError.DeviceDisposed("Cannot change cull mode on a disposed render pass context.");
+		}
+
+		try {
+			switch (mode) {
+				case CullMode.None:
+					GL.Disable(EnableCap.CullFace);
+					break;
+				case CullMode.Front:
+					GL.Enable(EnableCap.CullFace);
+					GL.CullFace(TriangleFace.Front);
+					break;
+				case CullMode.Back:
+					GL.Enable(EnableCap.CullFace);
+					GL.CullFace(TriangleFace.Back);
+					break;
+				default:
+					return GraphicsError.InvalidArgument($"Unsupported cull mode '{mode}'.");
+			}
+
+			return Unit.Value;
+		} catch (Exception exception) {
+			return GraphicsError.BackendFailure($"Failed to change cull mode: {exception.Message}");
+		}
+	}
+
 	public Result<GraphicsError> Clear(
 		ClearTargets targets,
 		Vector4 color,

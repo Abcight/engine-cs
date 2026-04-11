@@ -3,7 +3,9 @@ namespace ExampleGame;
 internal static class ExampleCatalog {
 	private static readonly ExampleDefinition[] Definitions = [
 		new("triangle", static () => new RainbowTriangleExample()),
-		new("cube", static () => new SpinningCubeExample())
+		new("cube", static () => new SpinningCubeExample()),
+		new("rendering-pbr", static () => new RenderingPbrSceneExample()),
+		new("rendering-custom", static () => new RenderingCustomMaterialExample())
 	];
 
 	public static IExample Create(string[] args, out string? selectionMessage) {

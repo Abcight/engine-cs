@@ -16,11 +16,17 @@ internal sealed class RenderingPbrSceneExample : ExampleBase {
 	private ModelInstanceHandle _leftInstance;
 	private ModelInstanceHandle _rightInstance;
 	private ModelInstanceHandle _centerInstance;
+	private ModelInstanceHandle _pointLightMarker;
 	private PointLightHandle _movingPointLight;
 
 	private Vector3 _cameraPosition;
 	private Vector3 _cameraTarget;
 	private float _time;
+	private Texture2D? _crateBaseColorTexture;
+	private Texture2D? _crateMetallicTexture;
+	private Texture2D? _crateNormalTexture;
+	private Texture2D? _crateRoughnessTexture;
+	private Texture2D? _crateOcclusionTexture;
 
 	public override string Id => "rendering-pbr";
 
@@ -31,6 +37,36 @@ internal sealed class RenderingPbrSceneExample : ExampleBase {
 		var scene = renderer.CreateScene().Expect("Failed to create render scene.");
 		_renderer = renderer;
 		_scene = scene;
+
+		var textureLoadOptions = new Texture2DLoadOptions(
+			GenerateMipmaps: true,
+			FlipVertically: true
+		);
+		_crateBaseColorTexture = context.Device.LoadTexture2DFromFile(
+			"res/textures/crate_pbr/Stylized_Crate_002_basecolor.jpg",
+			textureLoadOptions,
+			"Crate.BaseColor"
+		).Expect("Failed to load crate base color texture.");
+		_crateMetallicTexture = context.Device.LoadTexture2DFromFile(
+			"res/textures/crate_pbr/Stylized_Crate_002_metallic.jpg",
+			textureLoadOptions,
+			"Crate.Metallic"
+		).Expect("Failed to load crate metallic texture.");
+		_crateNormalTexture = context.Device.LoadTexture2DFromFile(
+			"res/textures/crate_pbr/Stylized_Crate_002_normal.jpg",
+			textureLoadOptions,
+			"Crate.Normal"
+		).Expect("Failed to load crate normal texture.");
+		_crateRoughnessTexture = context.Device.LoadTexture2DFromFile(
+			"res/textures/crate_pbr/Stylized_Crate_002_roughness.jpg",
+			textureLoadOptions,
+			"Crate.Roughness"
+		).Expect("Failed to load crate roughness texture.");
+		_crateOcclusionTexture = context.Device.LoadTexture2DFromFile(
+			"res/textures/crate_pbr/Stylized_Crate_002_ambientOcclusion.jpg",
+			textureLoadOptions,
+			"Crate.AmbientOcclusion"
+		).Expect("Failed to load crate ambient occlusion texture.");
 
 		_cameraPosition = new(0.0f, 1.5f, 5.2f);
 		_cameraTarget = new(0.0f, 0.0f, 0.0f);
@@ -46,24 +82,22 @@ internal sealed class RenderingPbrSceneExample : ExampleBase {
 		));
 		_camera = cameraResult.Expect("Failed to create the main camera.");
 
-		var directionalLightResult = scene.AddDirectionalLight(
+		scene.AddDirectionalLight(
 			new DirectionalLightDescription(
 				Direction: new(-0.6f, -1.0f, -0.35f),
 				Color: new(1.0f, 0.96f, 0.9f),
 				Intensity: 2.7f
 			)
-		);
-		_ = directionalLightResult.Expect("Failed to create the directional light.");
+		).Expect("Failed to create the directional light.");
 
-		var pointLightResult = scene.AddPointLight(
+		_movingPointLight = scene.AddPointLight(
 			new PointLightDescription(
 				Position: new(2.0f, 1.8f, 1.8f),
 				Color: new(0.3f, 0.6f, 1.0f),
 				Intensity: 8.0f,
 				Range: 10.0f
 			)
-		);
-		_movingPointLight = pointLightResult.Expect("Failed to create the moving point light.");
+		).Expect("Failed to create the moving point light.");
 
 		var meshDescriptor = new StaticMeshDescriptor<ScenePbrVertex, uint>(
 			Vertices: CubeMeshData.Vertices,
@@ -80,20 +114,36 @@ internal sealed class RenderingPbrSceneExample : ExampleBase {
 		var cubeModel = modelResult.Expect("Failed to create the cube model.");
 
 		var sharedMaterialResult = renderer.CreatePbrMaterial(new PbrMaterialParameters {
-			BaseColorFactor = new(0.92f, 0.22f, 0.15f, 1.0f),
-			MetallicFactor = 0.2f,
-			RoughnessFactor = 0.55f,
-			EmissiveFactor = new(0.02f, 0.0f, 0.0f)
+			BaseColorFactor = Vector4.One,
+			MetallicFactor = 1.0f,
+			RoughnessFactor = 1.0f,
+			OcclusionStrength = 1.0f,
+			BaseColorTexture = _crateBaseColorTexture,
+			NormalTexture = _crateNormalTexture,
+			MetallicRoughnessTexture = _crateMetallicTexture,
+			RoughnessTexture = _crateRoughnessTexture,
+			OcclusionTexture = _crateOcclusionTexture
 		});
 
 		var variantMaterialResult = renderer.CreatePbrMaterial(new PbrMaterialParameters {
-			BaseColorFactor = new(0.14f, 0.4f, 0.95f, 1.0f),
-			MetallicFactor = 0.8f,
-			RoughnessFactor = 0.22f,
-			EmissiveFactor = new(0.01f, 0.02f, 0.06f)
+			BaseColorFactor = new(0.72f, 0.84f, 1.0f, 1.0f),
+			MetallicFactor = 1.0f,
+			RoughnessFactor = 0.75f,
+			OcclusionStrength = 1.0f,
+			BaseColorTexture = _crateBaseColorTexture,
+			NormalTexture = _crateNormalTexture,
+			MetallicRoughnessTexture = _crateMetallicTexture,
+			RoughnessTexture = _crateRoughnessTexture,
+			OcclusionTexture = _crateOcclusionTexture
 		});
 		var sharedMaterial = sharedMaterialResult.Expect("Failed to create the shared PBR material.");
 		var variantMaterial = variantMaterialResult.Expect("Failed to create the variant PBR material.");
+		var lightMarkerMaterial = renderer.CreatePbrMaterial(new PbrMaterialParameters {
+			BaseColorFactor = new(0.0f, 0.0f, 0.0f, 1.0f),
+			EmissiveFactor = new(4.0f, 3.6f, 1.8f),
+			MetallicFactor = 0.0f,
+			RoughnessFactor = 1.0f
+		}).Expect("Failed to create point light marker material.");
 
 		var leftInstanceResult = scene.AddModelInstance(
 			cubeModel,
@@ -110,9 +160,15 @@ internal sealed class RenderingPbrSceneExample : ExampleBase {
 			variantMaterial,
 			Matrix4x4.CreateTranslation(0.0f, 0.0f, -2.0f)
 		);
+		var pointLightMarkerResult = scene.AddModelInstance(
+			cubeModel,
+			lightMarkerMaterial,
+			BuildTransform(new(2.0f, 1.8f, 1.8f), Quaternion.Identity, 0.18f)
+		);
 		_leftInstance = leftInstanceResult.Expect("Failed to create left model instance.");
 		_rightInstance = rightInstanceResult.Expect("Failed to create right model instance.");
 		_centerInstance = centerInstanceResult.Expect("Failed to create center model instance.");
+		_pointLightMarker = pointLightMarkerResult.Expect("Failed to create point light marker instance.");
 		_time = 0.0f;
 
 		return Unit.Value;
@@ -167,6 +223,14 @@ internal sealed class RenderingPbrSceneExample : ExampleBase {
 			MathF.Sin(_time * 0.8f) * 2.4f
 		);
 
+		var markerResult = _scene.SetModelInstanceTransform(
+			_pointLightMarker,
+			BuildTransform(pointPosition, Quaternion.Identity, 0.18f)
+		);
+		if (markerResult.IsErr) {
+			return markerResult;
+		}
+
 		return _scene.SetPointLight(
 			_movingPointLight,
 			new PointLightDescription(
@@ -209,8 +273,18 @@ internal sealed class RenderingPbrSceneExample : ExampleBase {
 	}
 
 	public override Result<GraphicsError> OnUnload(IWindowRenderContext context) {
+		_crateOcclusionTexture?.DisposeChecked();
+		_crateRoughnessTexture?.DisposeChecked();
+		_crateNormalTexture?.DisposeChecked();
+		_crateMetallicTexture?.DisposeChecked();
+		_crateBaseColorTexture?.DisposeChecked();
 		_scene?.Dispose();
 		_renderer?.Dispose();
+		_crateOcclusionTexture = null;
+		_crateRoughnessTexture = null;
+		_crateNormalTexture = null;
+		_crateMetallicTexture = null;
+		_crateBaseColorTexture = null;
 		_scene = null;
 		_renderer = null;
 		return Unit.Value;

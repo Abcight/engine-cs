@@ -27,12 +27,14 @@ uniform float _occlusion_strength;
 uniform sampler2D _base_color_texture;
 uniform sampler2D _normal_texture;
 uniform sampler2D _metallic_roughness_texture;
+uniform sampler2D _roughness_texture;
 uniform sampler2D _occlusion_texture;
 uniform sampler2D _emissive_texture;
 
 uniform bool _has_base_color_texture;
 uniform bool _has_normal_texture;
 uniform bool _has_metallic_roughness_texture;
+uniform bool _has_roughness_texture;
 uniform bool _has_occlusion_texture;
 uniform bool _has_emissive_texture;
 
@@ -73,14 +75,36 @@ void main() {
     if (_has_metallic_roughness_texture) {
         vec4 metalRoughSample = texture(_metallic_roughness_texture, vTexCoord);
         metallic *= clamp(metalRoughSample.b, 0.0, 1.0);
-        roughness *= clamp(metalRoughSample.g, 0.04, 1.0);
+        if (!_has_roughness_texture) {
+            roughness *= clamp(metalRoughSample.g, 0.04, 1.0);
+        }
+    }
+
+    if (_has_roughness_texture) {
+        float roughnessSample = texture(_roughness_texture, vTexCoord).r;
+        roughness *= clamp(roughnessSample, 0.04, 1.0);
     }
 
     vec3 normal = normalize(vWorldNormal);
     if (_has_normal_texture) {
         vec3 sampledNormal = texture(_normal_texture, vTexCoord).xyz * 2.0 - 1.0;
         if (length(sampledNormal) > 0.001) {
-            normal = normalize(sampledNormal);
+            vec3 dp1 = dFdx(vWorldPosition);
+            vec3 dp2 = dFdy(vWorldPosition);
+            vec2 duv1 = dFdx(vTexCoord);
+            vec2 duv2 = dFdy(vTexCoord);
+
+            vec3 tangent = dp1 * duv2.y - dp2 * duv1.y;
+            vec3 bitangent = dp2 * duv1.x - dp1 * duv2.x;
+            float tangentLen2 = dot(tangent, tangent);
+            float bitangentLen2 = dot(bitangent, bitangent);
+            if (tangentLen2 > 1e-8 && bitangentLen2 > 1e-8) {
+                tangent = normalize(tangent - normal * dot(normal, tangent));
+                float handedness = dot(cross(normal, tangent), bitangent) < 0.0 ? -1.0 : 1.0;
+                bitangent = normalize(cross(normal, tangent)) * handedness;
+                mat3 tbn = mat3(tangent, bitangent, normal);
+                normal = normalize(tbn * sampledNormal);
+            }
         }
     }
 

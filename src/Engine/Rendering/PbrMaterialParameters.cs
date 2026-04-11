@@ -13,6 +13,7 @@ public sealed class PbrMaterialParameters {
 	public Texture2D? BaseColorTexture { get; set; }
 	public Texture2D? NormalTexture { get; set; }
 	public Texture2D? MetallicRoughnessTexture { get; set; }
+	public Texture2D? RoughnessTexture { get; set; }
 	public Texture2D? OcclusionTexture { get; set; }
 	public Texture2D? EmissiveTexture { get; set; }
 }

@@ -221,12 +221,14 @@ public sealed class Renderer : IDisposable {
 		generatedParameters.BaseColorTexture = 0;
 		generatedParameters.NormalTexture = 1;
 		generatedParameters.MetallicRoughnessTexture = 2;
-		generatedParameters.OcclusionTexture = 3;
-		generatedParameters.EmissiveTexture = 4;
+		generatedParameters.RoughnessTexture = 3;
+		generatedParameters.OcclusionTexture = 4;
+		generatedParameters.EmissiveTexture = 5;
 
 		generatedParameters.HasBaseColorTexture = parameters.BaseColorTexture is not null;
 		generatedParameters.HasNormalTexture = parameters.NormalTexture is not null;
 		generatedParameters.HasMetallicRoughnessTexture = parameters.MetallicRoughnessTexture is not null;
+		generatedParameters.HasRoughnessTexture = parameters.RoughnessTexture is not null;
 		generatedParameters.HasOcclusionTexture = parameters.OcclusionTexture is not null;
 		generatedParameters.HasEmissiveTexture = parameters.EmissiveTexture is not null;
 
@@ -252,15 +254,22 @@ public sealed class Renderer : IDisposable {
 			}
 		}
 
+		if (parameters.RoughnessTexture is { } roughnessTexture) {
+			Result<GraphicsError> result = bindings.Bind(3, roughnessTexture);
+			if (result.IsErr) {
+				return result.Error;
+			}
+		}
+
 		if (parameters.OcclusionTexture is { } occlusionTexture) {
-			Result<GraphicsError> result = bindings.Bind(3, occlusionTexture);
+			Result<GraphicsError> result = bindings.Bind(4, occlusionTexture);
 			if (result.IsErr) {
 				return result.Error;
 			}
 		}
 
 		if (parameters.EmissiveTexture is { } emissiveTexture) {
-			Result<GraphicsError> result = bindings.Bind(4, emissiveTexture);
+			Result<GraphicsError> result = bindings.Bind(5, emissiveTexture);
 			if (result.IsErr) {
 				return result.Error;
 			}

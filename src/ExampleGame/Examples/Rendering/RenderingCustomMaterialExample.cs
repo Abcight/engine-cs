@@ -72,18 +72,16 @@ internal sealed class RenderingCustomMaterialExample : ExampleBase {
 				Color: new(1.0f, 1.0f, 0.95f),
 				Intensity: 2.4f
 			)
-		);
-		_ = lightResult.Expect("Failed to create the directional light.");
+		).Expect("Failed to create the directional light.");
 
-		var pointLightResult = scene.AddPointLight(
+		scene.AddPointLight(
 			new(
 				Position: new(0.0f, 1.3f, 2.2f),
 				Color: new(0.7f, 0.7f, 1.0f),
 				Intensity: 5.0f,
 				Range: 7.0f
 			)
-		);
-		_ = pointLightResult.Expect("Failed to create the point light.");
+		).Expect("Failed to create the point light.");
 
 		var warmParameters = CustomSceneShaderBinding.NewParameters();
 		warmParameters.TintColor = new(1.0f, 0.55f, 0.24f, 1.0f);

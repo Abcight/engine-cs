@@ -1,0 +1,15 @@
+Third-Party Assets License Notice
+
+The texture files contained in this directory were created by João Paulo and sourced from:
+
+https://3dtextures.me/2021/02/12/wood-crate-001/
+https://web.archive.org/web/20240823220330/https://3dtextures.me/2021/02/12/wood-crate-001/
+
+These files are licensed under the Creative Commons CC0 1.0 Universal (Public Domain Dedication), as described at:
+
+https://3dtextures.me/about/
+https://web.archive.org/web/20260314112539/https://3dtextures.me/about/
+
+Under CC0, these assets may be used, modified, and distributed without restriction and without attribution.
+
+This notice applies only to the texture files contained within this directory and does not extend to any files located outside of it.

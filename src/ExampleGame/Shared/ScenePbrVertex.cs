@@ -1,7 +1,7 @@
 using System.Numerics;
 using Engine.Graphics.VertexInput;
 
-namespace ExampleGame;
+namespace ExampleGame.Shared;
 
 [VertexLayout]
 internal readonly partial struct ScenePbrVertex {

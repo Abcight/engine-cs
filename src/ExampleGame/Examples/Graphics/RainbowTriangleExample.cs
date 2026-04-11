@@ -4,8 +4,11 @@ using Engine.Graphics.Contexts;
 using Engine.Graphics.Rendering;
 using Engine.Graphics.Resources;
 using Engine.Graphics.Shaders;
+using ExampleGame.Core;
+using ExampleGame.Shaders;
+using ExampleGame.Shared;
 
-namespace ExampleGame;
+namespace ExampleGame.Examples.Graphics;
 
 internal sealed class RainbowTriangleExample : ExampleBase {
 	private Shader<TriangleShaderBinding>? _shader;
@@ -17,38 +20,27 @@ internal sealed class RainbowTriangleExample : ExampleBase {
 	public override string DisplayName => "Rainbow Triangle";
 
 	public override Result<GraphicsError> OnLoad(IWindowRenderContext context) {
-		PositionColorVertex[] vertices = [
+		var vertices = new[] {
 			new PositionColorVertex( 0.0f,  0.65f, 0.0f, 1.0f, 0.0f, 0.0f),
 			new PositionColorVertex( 0.7f, -0.55f, 0.0f, 0.0f, 1.0f, 0.0f),
 			new PositionColorVertex(-0.7f, -0.55f, 0.0f, 0.0f, 0.0f, 1.0f)
-		];
+		};
 
-		var vertexBufferResult = context.Device.CreateVertexBuffer(
+		_vertexBuffer = context.Device.CreateVertexBuffer(
 			vertices,
 			BufferUsage.StaticDraw,
 			"RainbowTriangleVertices"
-		);
-		if (vertexBufferResult.IsErr) {
-			return vertexBufferResult.Error;
-		}
+		).Expect("Failed to create rainbow triangle vertex buffer.");
 
-		var indexBufferResult = context.Device.CreateIndexBuffer<uint>(
-			[0, 1, 2],
+		_indexBuffer = context.Device.CreateIndexBuffer(
+			[0u, 1u, 2u],
 			BufferUsage.StaticDraw,
 			"RainbowTriangleIndices"
-		);
-		if (indexBufferResult.IsErr) {
-			return indexBufferResult.Error;
-		}
+		).Expect("Failed to create rainbow triangle index buffer.");
 
-		var shaderResult = LoadShader<TriangleShaderBinding>(context);
-		if (shaderResult.IsErr) {
-			return shaderResult.Error;
-		}
-
-		_vertexBuffer = vertexBufferResult.Value;
-		_indexBuffer = indexBufferResult.Value;
-		_shader = shaderResult.Value;
+		_shader = context.LoadShader<TriangleShaderBinding>(
+			static warning => Console.WriteLine($"[shader warning] {warning}")
+		).Expect("Failed to load rainbow triangle shader.");
 		return Unit.Value;
 	}
 
@@ -57,23 +49,17 @@ internal sealed class RainbowTriangleExample : ExampleBase {
 			return GraphicsError.InvalidState("Cannot render the rainbow triangle before resources are created.");
 		}
 
-		var passResult = context.BeginRenderPass("Rainbow Triangle");
-		if (passResult.IsErr) {
-			return passResult.Error;
-		}
+		using RenderPass pass = context.BeginPass("Rainbow Triangle");
+		pass
+			.SetDepthTestEnabled(false)
+			.Clear(ClearTargets.Color, new Vector4(0.07f, 0.07f, 0.09f, 1.0f))
+			.BindShader(_shader)
+			.BindVertexBuffer(_vertexBuffer)
+			.BindIndexBuffer(_indexBuffer)
+			.SetVertexLayout(PositionColorVertex.Layout)
+			.DrawIndexed(PrimitiveTopology.Triangles, _indexBuffer.IndexCount);
 
-		var pass = passResult.Value;
-		using (pass) {
-			pass.SetDepthTestEnabled(false);
-			pass.Clear(ClearTargets.Color, new Vector4(0.07f, 0.07f, 0.09f, 1.0f));
-			pass.BindShader(_shader);
-			pass.BindVertexBuffer(_vertexBuffer);
-			pass.BindIndexBuffer(_indexBuffer);
-			pass.SetVertexLayout(PositionColorVertex.Layout);
-			pass.DrawIndexed(PrimitiveTopology.Triangles, _indexBuffer.IndexCount);
-		}
-
-		return context.Present();
+		return pass.EndAndPresent(context);
 	}
 
 	public override Result<GraphicsError> OnUnload(IWindowRenderContext context) {

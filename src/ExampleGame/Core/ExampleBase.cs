@@ -2,7 +2,7 @@ using Engine;
 using Engine.Graphics.Contexts;
 using Engine.Graphics.Shaders;
 
-namespace ExampleGame;
+namespace ExampleGame.Core;
 
 internal abstract class ExampleBase : IExample {
 	public abstract string Id { get; }
@@ -22,21 +22,5 @@ internal abstract class ExampleBase : IExample {
 
 	public virtual Result<GraphicsError> OnUnload(IWindowRenderContext context) {
 		return Unit.Value;
-	}
-
-	protected static Result<Shader<TBinding>, GraphicsError> LoadShader<TBinding>(IWindowRenderContext context)
-		where TBinding : class, IGeneratedShaderBinding, new() {
-		var shaderLoadResult = context.Device.LoadShader<TBinding>();
-		if (shaderLoadResult.IsErr) {
-			ShaderLoadReport report = shaderLoadResult.Error;
-			return GraphicsError.BackendFailure(report.Error ?? "Shader load failed.");
-		}
-
-		ShaderLoadSuccess<TBinding> shaderLoad = shaderLoadResult.Value;
-		foreach (string warning in shaderLoad.Warnings) {
-			Console.WriteLine($"[shader warning] {warning}");
-		}
-
-		return shaderLoad.Shader;
 	}
 }

@@ -2,11 +2,11 @@ using Engine;
 using Engine.Graphics.Contexts;
 using Engine.Graphics.Shaders;
 
-namespace ExampleGame;
+namespace ExampleGame.Core;
 
 public static class EntryPoint {
 	public static void Main(string[] args) {
-		IExample example = ExampleCatalog.Create(args, out string? selectionMessage);
+		var example = ExampleCatalog.Create(args, out string? selectionMessage);
 		if (!string.IsNullOrWhiteSpace(selectionMessage)) {
 			Console.WriteLine(selectionMessage);
 		}
@@ -20,7 +20,7 @@ public static class EntryPoint {
 		);
 
 		if (contextResult.IsErr) {
-			GraphicsError error = contextResult.Error;
+			var error = contextResult.Error;
 			Console.Error.WriteLine($"[context] {error.Code}: {error.Message}");
 			return;
 		}

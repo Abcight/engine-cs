@@ -1,4 +1,7 @@
-namespace ExampleGame;
+using ExampleGame.Examples.Graphics;
+using ExampleGame.Examples.Rendering;
+
+namespace ExampleGame.Core;
 
 internal static class ExampleCatalog {
 	private static readonly ExampleDefinition[] Definitions = [

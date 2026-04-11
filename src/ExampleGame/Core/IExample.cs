@@ -2,7 +2,7 @@ using Engine;
 using Engine.Graphics.Contexts;
 using Engine.Graphics.Shaders;
 
-namespace ExampleGame;
+namespace ExampleGame.Core;
 
 internal interface IExample {
 	string Id { get; }

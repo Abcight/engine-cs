@@ -43,6 +43,17 @@ public sealed class Renderer : IDisposable {
 		return new RenderScene();
 	}
 
+	public Result<Shader<TBinding>, GraphicsError> LoadShader<TBinding>(
+		Action<string>? onWarning = null
+	)
+		where TBinding : class, IGeneratedShaderBinding, new() {
+		if (_disposed) {
+			return GraphicsError.DeviceDisposed("Cannot load shaders from a disposed renderer.");
+		}
+
+		return _context.LoadShader<TBinding>(onWarning);
+	}
+
 	public Result<GraphicsError> AddFeature(IRenderFeature feature) {
 		if (_disposed) {
 			return GraphicsError.DeviceDisposed("Cannot add a feature to a disposed renderer.");
@@ -331,23 +342,18 @@ public sealed class Renderer : IDisposable {
 			return beforeFeaturesResult;
 		}
 
-		Result<IRenderPassContext, GraphicsError> passResult = _context.BeginRenderPass(label ?? "Engine.Rendering.Scene");
-		if (passResult.IsErr) {
-			return passResult.Error;
+		using RenderPass pass = _context.BeginPass(label ?? "Engine.Rendering.Scene");
+		pass.Clear(ClearTargets.ColorAndDepth, clearColor);
+		foreach (RenderScene.ModelInstanceState instance in scene.EnumerateModelInstances()) {
+			pass.Run(ctx => DrawInstance(ctx, scene, cameraState, instance));
+			if (pass.IsFaulted) {
+				break;
+			}
 		}
 
-		using (IRenderPassContext pass = passResult.Value) {
-			Result<GraphicsError> clearResult = pass.Clear(ClearTargets.ColorAndDepth, clearColor);
-			if (clearResult.IsErr) {
-				return clearResult;
-			}
-
-			foreach (RenderScene.ModelInstanceState instance in scene.EnumerateModelInstances()) {
-				Result<GraphicsError> drawResult = DrawInstance(pass, scene, cameraState, instance);
-				if (drawResult.IsErr) {
-					return drawResult;
-				}
-			}
+		Result<GraphicsError> passEndResult = pass.End();
+		if (passEndResult.IsErr) {
+			return passEndResult;
 		}
 
 		Result<GraphicsError> afterFeaturesResult = InvokeAfterSceneFeatures(featureContext);
@@ -466,19 +472,14 @@ public sealed class Renderer : IDisposable {
 			return _builtInPbrShader;
 		}
 
-		Result<ShaderLoadSuccess<BuiltInPbrShaderBinding>, ShaderLoadReport> loadResult = _context.Device.LoadShader<BuiltInPbrShaderBinding>();
+		Result<Shader<BuiltInPbrShaderBinding>, GraphicsError> loadResult = LoadShader<BuiltInPbrShaderBinding>(
+			static warning => Console.WriteLine($"[rendering:pbr warning] {warning}")
+		);
 		if (loadResult.IsErr) {
-			ShaderLoadReport report = loadResult.TryErr()!.Error;
-			string message = report.Error ?? "Built-in PBR shader failed to load.";
-			return GraphicsError.BackendFailure(message);
+			return loadResult.Error;
 		}
 
-		ShaderLoadSuccess<BuiltInPbrShaderBinding> success = loadResult.Value;
-		foreach (string warning in success.Warnings) {
-			Console.WriteLine($"[rendering:pbr warning] {warning}");
-		}
-
-		_builtInPbrShader = success.Shader;
+		_builtInPbrShader = loadResult.Value;
 		return _builtInPbrShader;
 	}
 

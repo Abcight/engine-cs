@@ -1,4 +1,4 @@
-namespace ExampleGame;
+namespace ExampleGame.Shared;
 
 internal static class CubeMeshData {
 	public static ScenePbrVertex[] Vertices { get; } = [

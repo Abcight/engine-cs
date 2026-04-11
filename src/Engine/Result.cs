@@ -2,7 +2,9 @@ using System.Diagnostics.CodeAnalysis;
 
 namespace Engine;
 
-public abstract record Result<T, E> {
+public abstract record Result<T, E>
+	where T : notnull
+	where E : notnull {
 
 	private Result() {
 	}
@@ -66,17 +68,20 @@ public abstract record Result<T, E> {
 	public T ValueOr(T fallback) =>
 		this is Ok ok ? ok.Value : fallback;
 
-	public Result<U, E> AndThen<U>(Func<T, Result<U, E>> f) =>
+	public Result<U, E> AndThen<U>(Func<T, Result<U, E>> f)
+		where U : notnull =>
 		this is Ok ok ? f(ok.Value) : ((Err)this).Error;
 
-	public Result<U, E> Map<U>(Func<T, U> f) =>
+	public Result<U, E> Map<U>(Func<T, U> f)
+		where U : notnull =>
 		this is Ok ok ? f(ok.Value) : ((Err)this).Error;
 
 	public static implicit operator Result<T, E>(T value) => new Ok(value);
 	public static implicit operator Result<T, E>(E error) => new Err(error);
 }
 
-public abstract record Result<E> {
+public abstract record Result<E>
+	where E : notnull {
 
 	private Result() {
 	}
@@ -120,7 +125,8 @@ public abstract record Result<E> {
 	public Result<E> AndThen(Func<Result<E>> f) =>
 		this is Ok ? f() : this;
 
-	public Result<T, E> AndThen<T>(Func<Result<T, E>> f) =>
+	public Result<T, E> AndThen<T>(Func<Result<T, E>> f)
+		where T : notnull =>
 		this is Ok ? f() : ((Err)this).Error;
 
 	public static implicit operator Result<E>(E error) => new Err(error);
@@ -130,5 +136,5 @@ public abstract record Result<E> {
 		result is Ok ? (Result<Unit, E>)Unit.Value : ((Err)result).Error;
 
 	public static implicit operator Result<E>(Result<Unit, E> result) =>
-		result.IsOk ? Ok.Instance : (Result<E>)result.Error!;
+		result.TryErr() is { Error: var error } ? new Err(error) : Ok.Instance;
 }

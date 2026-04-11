@@ -21,6 +21,8 @@ public interface IRenderPassContext : IDisposable {
 
 	Result<GraphicsError> SetVertexLayout(VertexLayoutDescription layout);
 
+	Result<GraphicsError> SetDepthTestEnabled(bool enabled);
+
 	Result<GraphicsError> Clear(
 		ClearTargets targets,
 		Vector4 color,

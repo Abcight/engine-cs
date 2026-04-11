@@ -156,6 +156,25 @@ public sealed class OpenGlRenderPassContext : IRenderPassContext {
 		}
 	}
 
+	public Result<GraphicsError> SetDepthTestEnabled(bool enabled) {
+		if (_disposed) {
+			return GraphicsError.DeviceDisposed("Cannot change depth testing on a disposed render pass context.");
+		}
+
+		try {
+			if (enabled) {
+				GL.Enable(EnableCap.DepthTest);
+				GL.DepthFunc(DepthFunction.Less);
+			} else {
+				GL.Disable(EnableCap.DepthTest);
+			}
+
+			return Unit.Value;
+		} catch (Exception exception) {
+			return GraphicsError.BackendFailure($"Failed to change depth testing state: {exception.Message}");
+		}
+	}
+
 	public Result<GraphicsError> Clear(
 		ClearTargets targets,
 		Vector4 color,

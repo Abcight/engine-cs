@@ -8,7 +8,7 @@ using OpenTkMatrix4 = OpenTK.Mathematics.Matrix4;
 using GlTextureMagFilter = OpenTK.Graphics.OpenGL4.TextureMagFilter;
 using GlTextureMinFilter = OpenTK.Graphics.OpenGL4.TextureMinFilter;
 
-namespace Engine.Graphics.OpenGL;
+namespace Engine.Graphics.Backend.OpenGL;
 
 public sealed class OpenGlGraphicsDevice : IGraphicsDevice, IOpenGlNativeAccess {
 	private bool _disposed;
@@ -380,7 +380,7 @@ public sealed class OpenGlGraphicsDevice : IGraphicsDevice, IOpenGlNativeAccess 
 		};
 	}
 
-	private static GlTextureMinFilter ToGlMinFilter(Engine.Graphics.Resources.TextureMinFilter filter) {
+	private static GlTextureMinFilter ToGlMinFilter(Resources.TextureMinFilter filter) {
 		return filter switch {
 			Engine.Graphics.Resources.TextureMinFilter.Nearest => GlTextureMinFilter.Nearest,
 			Engine.Graphics.Resources.TextureMinFilter.Linear => GlTextureMinFilter.Linear,
@@ -390,7 +390,7 @@ public sealed class OpenGlGraphicsDevice : IGraphicsDevice, IOpenGlNativeAccess 
 		};
 	}
 
-	private static GlTextureMagFilter ToGlMagFilter(Engine.Graphics.Resources.TextureMagFilter filter) {
+	private static GlTextureMagFilter ToGlMagFilter(Resources.TextureMagFilter filter) {
 		return filter switch {
 			Engine.Graphics.Resources.TextureMagFilter.Nearest => GlTextureMagFilter.Nearest,
 			Engine.Graphics.Resources.TextureMagFilter.Linear => GlTextureMagFilter.Linear,

@@ -1,4 +1,4 @@
-namespace Engine.Graphics.OpenGL;
+namespace Engine.Graphics.Backend.OpenGL;
 
 public interface IOpenGlNativeAccess {
 	void PushDebugGroup(string label);

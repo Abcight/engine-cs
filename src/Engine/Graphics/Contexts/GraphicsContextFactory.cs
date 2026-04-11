@@ -1,4 +1,4 @@
-using Engine.Graphics.OpenGL;
+using Engine.Graphics.Backend.OpenGL;
 using Engine.Graphics.Shaders;
 
 namespace Engine.Graphics.Contexts;

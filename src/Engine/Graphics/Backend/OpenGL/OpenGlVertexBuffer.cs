@@ -1,9 +1,8 @@
-using System.Runtime.InteropServices;
 using Engine.Graphics.Resources;
 using Engine.Graphics.Shaders;
 using OpenTK.Graphics.OpenGL4;
 
-namespace Engine.Graphics.OpenGL;
+namespace Engine.Graphics.Backend.OpenGL;
 
 internal sealed class OpenGlVertexBuffer<TVertex> : VertexBuffer<TVertex>
 	where TVertex : unmanaged {

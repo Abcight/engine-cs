@@ -5,7 +5,7 @@ using Engine.Graphics.Shaders;
 using Engine.Graphics.VertexInput;
 using OpenTK.Graphics.OpenGL4;
 
-namespace Engine.Graphics.OpenGL;
+namespace Engine.Graphics.Backend.OpenGL;
 
 public sealed class OpenGlRenderPassContext : IRenderPassContext {
 	private bool _disposed;

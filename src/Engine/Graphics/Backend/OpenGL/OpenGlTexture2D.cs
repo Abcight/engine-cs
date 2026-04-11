@@ -2,7 +2,7 @@ using Engine.Graphics.Resources;
 using Engine.Graphics.Shaders;
 using OpenTK.Graphics.OpenGL4;
 
-namespace Engine.Graphics.OpenGL;
+namespace Engine.Graphics.Backend.OpenGL;
 
 internal sealed class OpenGlTexture2D : Texture2D {
 

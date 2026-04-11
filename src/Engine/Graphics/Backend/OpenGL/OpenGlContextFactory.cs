@@ -1,7 +1,7 @@
 using Engine.Graphics.Contexts;
 using Engine.Graphics.Shaders;
 
-namespace Engine.Graphics.OpenGL;
+namespace Engine.Graphics.Backend.OpenGL;
 
 public static class OpenGlContextFactory {
 	public static Result<IWindowRenderContext, GraphicsError> CreateWindow(WindowRenderContextOptions options) {

@@ -3,7 +3,7 @@ using Engine.Graphics.Resources;
 using Engine.Graphics.Shaders;
 using OpenTK.Graphics.OpenGL4;
 
-namespace Engine.Graphics.OpenGL;
+namespace Engine.Graphics.Backend.OpenGL;
 
 internal sealed class OpenGlRenderTargetContext : IRenderTargetContext {
 	private readonly OpenGlGraphicsDevice _device;

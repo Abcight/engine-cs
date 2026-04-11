@@ -5,7 +5,7 @@ using OpenTK.Mathematics;
 using OpenTK.Windowing.Common;
 using OpenTK.Windowing.Desktop;
 
-namespace Engine.Graphics.OpenGL;
+namespace Engine.Graphics.Backend.OpenGL;
 
 internal sealed class OpenGlWindowRenderContext : IWindowRenderContext {
 	private readonly OpenGlGraphicsDevice _device;

@@ -51,8 +51,7 @@ public static class ImageDecoders {
 		byte[] encodedBytes;
 		try {
 			encodedBytes = File.ReadAllBytes(resolvedPath);
-		}
-		catch (Exception ex) {
+		} catch (Exception ex) {
 			return GraphicsError.BackendFailure($"Failed to read image file '{path}': {ex.Message}");
 		}
 
@@ -93,14 +92,11 @@ internal sealed class ImageSharpImageDecoder : IImageDecoder {
 			image.CopyPixelDataTo(pixels);
 
 			return new DecodedImage2D(image.Width, image.Height, TextureFormat.RGBA8, pixels);
-		}
-		catch (UnknownImageFormatException ex) {
+		} catch (UnknownImageFormatException ex) {
 			return GraphicsError.InvalidArgument($"Unsupported image format: {ex.Message}");
-		}
-		catch (ImageFormatException ex) {
+		} catch (ImageFormatException ex) {
 			return GraphicsError.InvalidArgument($"Image decode failed: {ex.Message}");
-		}
-		catch (Exception ex) {
+		} catch (Exception ex) {
 			return GraphicsError.BackendFailure($"Image decode failed unexpectedly: {ex.Message}");
 		}
 	}

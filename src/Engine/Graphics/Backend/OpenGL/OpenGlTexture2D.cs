@@ -1,3 +1,4 @@
+using System.Threading;
 using Engine.Graphics.Resources;
 using Engine.Graphics.Shaders;
 using OpenTK.Graphics.OpenGL4;
@@ -7,7 +8,7 @@ namespace Engine.Graphics.Backend.OpenGL;
 internal sealed class OpenGlTexture2D : Texture2D {
 
 	private readonly OpenGlGraphicsDevice _device;
-	private readonly int _handle;
+	private int _handle;
 	private readonly OpenGlGraphicsDevice.TextureFormatSpec _formatSpec;
 	private readonly int _expectedByteCount;
 	private readonly bool _isRenderTarget;
@@ -27,17 +28,22 @@ internal sealed class OpenGlTexture2D : Texture2D {
 		_isRenderTarget = isRenderTarget;
 	}
 
+	~OpenGlTexture2D() {
+		EnqueueTextureForDisposal();
+	}
+
 	protected override Result<GraphicsError> BindCore(IRenderPassContext context, int textureUnit) {
 		if (!OpenGlGraphicsDevice.TryGetCompatibleContext(context, _device, out _, out GraphicsError contextError)) {
 			return contextError;
 		}
 
-		if (!GL.IsTexture(_handle)) {
+		int textureHandle = _handle;
+		if (textureHandle == 0 || !GL.IsTexture(textureHandle)) {
 			return GraphicsError.InvalidState("Cannot bind a deleted texture.");
 		}
 
 		GL.ActiveTexture(TextureUnit.Texture0 + textureUnit);
-		GL.BindTexture(TextureTarget.Texture2D, _handle);
+		GL.BindTexture(TextureTarget.Texture2D, textureHandle);
 		return Unit.Value;
 	}
 
@@ -52,12 +58,13 @@ internal sealed class OpenGlTexture2D : Texture2D {
 			);
 		}
 
-		if (!GL.IsTexture(_handle)) {
+		int textureHandle = _handle;
+		if (textureHandle == 0 || !GL.IsTexture(textureHandle)) {
 			return GraphicsError.InvalidState("Cannot update a deleted texture.");
 		}
 
 		byte[] pixelBytes = pixels.ToArray();
-		GL.BindTexture(TextureTarget.Texture2D, _handle);
+		GL.BindTexture(TextureTarget.Texture2D, textureHandle);
 		GL.TexSubImage2D(
 			TextureTarget.Texture2D,
 			0,
@@ -78,10 +85,22 @@ internal sealed class OpenGlTexture2D : Texture2D {
 	}
 
 	protected override Result<GraphicsError> DisposeCore() {
-		if (GL.IsTexture(_handle)) {
-			GL.DeleteTexture(_handle);
+		EnqueueTextureForDisposal();
+		GC.SuppressFinalize(this);
+		return Unit.Value;
+	}
+
+	private void EnqueueTextureForDisposal() {
+		int textureHandle = Interlocked.Exchange(ref _handle, 0);
+		if (textureHandle == 0) {
+			return;
 		}
 
-		return Unit.Value;
+		GLGC.Enqueue(
+			_device.GarbageCollectorBucketId,
+			GLGC.DeletionKind.Texture,
+			textureHandle,
+			_expectedByteCount
+		);
 	}
 }

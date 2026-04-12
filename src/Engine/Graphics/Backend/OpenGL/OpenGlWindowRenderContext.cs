@@ -95,6 +95,7 @@ internal sealed class OpenGlWindowRenderContext : IWindowRenderContext {
 
 		try {
 			_window.SwapBuffers();
+			_device.DrainDeferredDisposals();
 			return Unit.Value;
 		} catch (Exception exception) {
 			return GraphicsError.BackendFailure($"Failed to swap window buffers: {exception.Message}");
@@ -119,6 +120,7 @@ internal sealed class OpenGlWindowRenderContext : IWindowRenderContext {
 		} catch (Exception) {
 		}
 
+		_device.DrainDeferredDisposals(force: true);
 		_window.Dispose();
 		_device.Dispose();
 		_disposed = true;

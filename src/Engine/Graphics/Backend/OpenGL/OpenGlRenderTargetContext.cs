@@ -1,3 +1,4 @@
+using System.Threading;
 using Engine.Graphics.Contexts;
 using Engine.Graphics.Resources;
 using Engine.Graphics.Shaders;
@@ -7,8 +8,8 @@ namespace Engine.Graphics.Backend.OpenGL;
 
 internal sealed class OpenGlRenderTargetContext : IRenderTargetContext {
 	private readonly OpenGlGraphicsDevice _device;
-	private readonly int _framebufferHandle;
-	private readonly int _depthRenderbufferHandle;
+	private int _framebufferHandle;
+	private int _depthRenderbufferHandle;
 	private bool _disposed;
 
 	private OpenGlRenderTargetContext(
@@ -25,6 +26,10 @@ internal sealed class OpenGlRenderTargetContext : IRenderTargetContext {
 		_framebufferHandle = framebufferHandle;
 		ColorTexture = colorTexture;
 		_depthRenderbufferHandle = depthRenderbufferHandle;
+	}
+
+	~OpenGlRenderTargetContext() {
+		EnqueueNativeHandlesForDisposal();
 	}
 
 	public IGraphicsDevice Device => _device;
@@ -195,6 +200,7 @@ internal sealed class OpenGlRenderTargetContext : IRenderTargetContext {
 			return GraphicsError.DeviceDisposed("Cannot present a disposed render target context.");
 		}
 
+		_device.DrainDeferredDisposals();
 		return Unit.Value;
 	}
 
@@ -204,22 +210,11 @@ internal sealed class OpenGlRenderTargetContext : IRenderTargetContext {
 		}
 
 		_ = ColorTexture.DisposeChecked();
-
-		try {
-			if (_depthRenderbufferHandle != 0 && GL.IsRenderbuffer(_depthRenderbufferHandle)) {
-				GL.DeleteRenderbuffer(_depthRenderbufferHandle);
-			}
-		} catch (Exception) {
-		}
-
-		try {
-			if (_framebufferHandle != 0 && GL.IsFramebuffer(_framebufferHandle)) {
-				GL.DeleteFramebuffer(_framebufferHandle);
-			}
-		} catch (Exception) {
-		}
+		EnqueueNativeHandlesForDisposal();
+		_device.DrainDeferredDisposals(force: true);
 
 		_disposed = true;
+		GC.SuppressFinalize(this);
 	}
 
 	private static Texture2D CreateRenderTargetTexture(
@@ -233,6 +228,26 @@ internal sealed class OpenGlRenderTargetContext : IRenderTargetContext {
 
 		int expectedByteCount = descriptor.Width * descriptor.Height * formatSpec.BytesPerPixel;
 		return new OpenGlTexture2D(device, textureHandle, descriptor, formatSpec, expectedByteCount, isRenderTarget: true);
+	}
+
+	private void EnqueueNativeHandlesForDisposal() {
+		int framebufferHandle = Interlocked.Exchange(ref _framebufferHandle, 0);
+		if (framebufferHandle != 0) {
+			GLGC.Enqueue(
+				_device.GarbageCollectorBucketId,
+				GLGC.DeletionKind.Framebuffer,
+				framebufferHandle
+			);
+		}
+
+		int depthHandle = Interlocked.Exchange(ref _depthRenderbufferHandle, 0);
+		if (depthHandle != 0) {
+			GLGC.Enqueue(
+				_device.GarbageCollectorBucketId,
+				GLGC.DeletionKind.Renderbuffer,
+				depthHandle
+			);
+		}
 	}
 
 	private static bool TryMapColorFormat(

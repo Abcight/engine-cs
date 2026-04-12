@@ -1,4 +1,5 @@
 using System.Numerics;
+using Engine.Graphics.Assets;
 using Engine.Graphics.Contexts;
 using Engine.Graphics.Rendering;
 using Engine.Graphics.Resources;
@@ -41,6 +42,14 @@ public sealed class Renderer : IDisposable {
 		}
 
 		return new RenderScene();
+	}
+
+	public Result<Assets, GraphicsError> CreateAssets(AssetsOptions? options = null) {
+		if (_disposed) {
+			return GraphicsError.DeviceDisposed("Cannot create an assets registry from a disposed renderer.");
+		}
+
+		return new Assets(_context, options);
 	}
 
 	public Result<Shader<TBinding>, GraphicsError> LoadShader<TBinding>(

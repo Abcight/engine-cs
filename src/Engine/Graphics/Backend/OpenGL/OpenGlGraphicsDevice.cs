@@ -1,6 +1,8 @@
 using System.Numerics;
 using System.Reflection;
 using System.Runtime.InteropServices;
+using System.Threading;
+using Engine.Graphics.Assets;
 using Engine.Graphics.Resources;
 using Engine.Graphics.Shaders;
 using OpenTK.Graphics.OpenGL4;
@@ -10,9 +12,18 @@ using GlTextureMinFilter = OpenTK.Graphics.OpenGL4.TextureMinFilter;
 
 namespace Engine.Graphics.Backend.OpenGL;
 
-public sealed class OpenGlGraphicsDevice : IGraphicsDevice, IOpenGlNativeAccess {
+public sealed class OpenGlGraphicsDevice : IGraphicsDevice, IOpenGlNativeAccess, IDeferredDisposalController {
 	private bool _disposed;
 	private int _defaultVertexArray;
+	private readonly int _garbageCollectorBucketId;
+
+	public OpenGlGraphicsDevice() {
+		_garbageCollectorBucketId = GLGC.RegisterBucket();
+	}
+
+	~OpenGlGraphicsDevice() {
+		EnqueueDefaultVertexArrayForDisposal();
+	}
 
 	public Result<IRenderPassContext, GraphicsError> BeginRenderPass(string? label = null) {
 		if (_disposed) {
@@ -20,6 +31,8 @@ public sealed class OpenGlGraphicsDevice : IGraphicsDevice, IOpenGlNativeAccess 
 		}
 
 		try {
+			DrainDeferredDisposals();
+
 			var vaoResult = EnsureDefaultVertexArray();
 			if (vaoResult.TryErr() is { Error: var error }) {
 				return error;
@@ -60,7 +73,12 @@ public sealed class OpenGlGraphicsDevice : IGraphicsDevice, IOpenGlNativeAccess 
 			TrySetObjectLabel(ObjectLabelIdentifier.Buffer, handle, label);
 
 			return new OpenGlVertexBuffer<TVertex>(
-				this, handle, vertices.Length, Marshal.SizeOf<TVertex>(), usageHint
+				this,
+				handle,
+				vertices.Length,
+				Marshal.SizeOf<TVertex>(),
+				usageHint,
+				checked(vertices.Length * Marshal.SizeOf<TVertex>())
 			);
 		} catch (Exception exception) {
 			try {
@@ -103,7 +121,13 @@ public sealed class OpenGlGraphicsDevice : IGraphicsDevice, IOpenGlNativeAccess 
 			TrySetObjectLabel(ObjectLabelIdentifier.Buffer, handle, label);
 
 			return new OpenGlIndexBuffer<TIndex>(
-				this, handle, indices.Length, elementSizeInBytes, indexElementType, usageHint
+				this,
+				handle,
+				indices.Length,
+				elementSizeInBytes,
+				indexElementType,
+				usageHint,
+				checked(indices.Length * elementSizeInBytes)
 			);
 		} catch (Exception exception) {
 			try {
@@ -210,6 +234,14 @@ public sealed class OpenGlGraphicsDevice : IGraphicsDevice, IOpenGlNativeAccess 
 		}
 
 		return GraphicsError.InvalidContext($"Backend '{typeof(TBackend).Name}' is not available.");
+	}
+
+	public Result<GraphicsError> SetAllowDisposal(bool allow) {
+		if (_disposed) {
+			return GraphicsError.DeviceDisposed("Cannot change disposal policy on a disposed graphics device.");
+		}
+
+		return GLGC.SetAllowDisposal(_garbageCollectorBucketId, allow);
 	}
 
 	public Result<ShaderLoadSuccess<TBinding>, ShaderLoadReport> LoadShader<TBinding>()
@@ -319,16 +351,10 @@ public sealed class OpenGlGraphicsDevice : IGraphicsDevice, IOpenGlNativeAccess 
 			return;
 		}
 
-		if (_defaultVertexArray != 0) {
-			try {
-				if (GL.IsVertexArray(_defaultVertexArray)) {
-					GL.DeleteVertexArray(_defaultVertexArray);
-				}
-			} catch (Exception) {
-			}
-		}
-
+		EnqueueDefaultVertexArrayForDisposal();
+		DrainDeferredDisposals(force: true);
 		_disposed = true;
+		GC.SuppressFinalize(this);
 	}
 
 	private Result<GraphicsError> EnsureDefaultVertexArray() {
@@ -369,6 +395,21 @@ public sealed class OpenGlGraphicsDevice : IGraphicsDevice, IOpenGlNativeAccess 
 		openGlContext = typedContext;
 		error = GraphicsError.None;
 		return true;
+	}
+
+	internal void DrainDeferredDisposals(bool force = false) {
+		GLGC.Drain(_garbageCollectorBucketId, force);
+	}
+
+	internal int GarbageCollectorBucketId => _garbageCollectorBucketId;
+
+	private void EnqueueDefaultVertexArrayForDisposal() {
+		int vao = Interlocked.Exchange(ref _defaultVertexArray, 0);
+		if (vao == 0) {
+			return;
+		}
+
+		GLGC.Enqueue(_garbageCollectorBucketId, GLGC.DeletionKind.VertexArray, vao);
 	}
 
 	private static BufferUsageHint ToBufferUsageHint(BufferUsage usage) {

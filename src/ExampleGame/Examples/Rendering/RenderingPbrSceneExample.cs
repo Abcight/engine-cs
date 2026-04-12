@@ -1,6 +1,5 @@
 using System.Numerics;
 using Engine;
-using Engine.Graphics.Assets;
 using Engine.Graphics.Contexts;
 using Engine.Graphics.Resources;
 using Engine.Graphics.Shaders;
@@ -41,7 +40,7 @@ internal sealed class RenderingPbrSceneExample : ExampleBase {
 		_cameraPosition = new(0.0f, 1.5f, 5.2f);
 		_cameraTarget = new(0.0f, 0.0f, 0.0f);
 		float aspectRatio = context.Height > 0 ? context.Width / (float)context.Height : 1.0f;
-		var cameraResult = _scene.AddPerspectiveCamera(new PerspectiveCameraDescription(
+		_camera = _scene.AddPerspectiveCamera(new PerspectiveCameraDescription(
 			Position: _cameraPosition,
 			Target: _cameraTarget,
 			Up: Vector3.UnitY,
@@ -49,8 +48,7 @@ internal sealed class RenderingPbrSceneExample : ExampleBase {
 			AspectRatio: aspectRatio,
 			NearPlane: 0.1f,
 			FarPlane: 200.0f
-		));
-		_camera = cameraResult.Expect("Failed to create the main camera.");
+		)).Expect("Failed to create the main camera.");
 
 		_scene.AddDirectionalLight(
 			new DirectionalLightDescription(
@@ -75,15 +73,14 @@ internal sealed class RenderingPbrSceneExample : ExampleBase {
 			VertexLayout: ScenePbrVertex.Layout
 		);
 
-		var modelResult = _renderer.CreateStaticModel(
+		var cubeModel = _renderer.CreateStaticModel(
 			_scene,
 			meshDescriptor,
 			BufferUsage.StaticDraw,
 			"PbrCube"
-		);
-		var cubeModel = modelResult.Expect("Failed to create the cube model.");
+		).Expect("Failed to create the cube model.");
 
-		var sharedMaterialResult = _renderer.CreatePbrMaterial(new PbrMaterialParameters {
+		var sharedMaterial = _renderer.CreatePbrMaterial(new PbrMaterialParameters {
 			BaseColorFactor = Vector4.One,
 			MetallicFactor = 1.0f,
 			RoughnessFactor = 1.0f,
@@ -93,9 +90,9 @@ internal sealed class RenderingPbrSceneExample : ExampleBase {
 			MetallicRoughnessTexture = _crateAssets.Metallic.Get(),
 			RoughnessTexture = _crateAssets.Roughness.Get(),
 			OcclusionTexture = _crateAssets.Occlusion.Get()
-		});
+		}).Expect("Failed to create the shared PBR material.");
 
-		var variantMaterialResult = _renderer.CreatePbrMaterial(new PbrMaterialParameters {
+		var variantMaterial = _renderer.CreatePbrMaterial(new PbrMaterialParameters {
 			BaseColorFactor = new(0.72f, 0.84f, 1.0f, 1.0f),
 			MetallicFactor = 1.0f,
 			RoughnessFactor = 0.75f,
@@ -105,9 +102,8 @@ internal sealed class RenderingPbrSceneExample : ExampleBase {
 			MetallicRoughnessTexture = _crateAssets.Metallic.Get(),
 			RoughnessTexture = _crateAssets.Roughness.Get(),
 			OcclusionTexture = _crateAssets.Occlusion.Get()
-		});
-		var sharedMaterial = sharedMaterialResult.Expect("Failed to create the shared PBR material.");
-		var variantMaterial = variantMaterialResult.Expect("Failed to create the variant PBR material.");
+		}).Expect("Failed to create the variant PBR material.");
+
 		var lightMarkerMaterial = _renderer.CreatePbrMaterial(new PbrMaterialParameters {
 			BaseColorFactor = new(0.0f, 0.0f, 0.0f, 1.0f),
 			EmissiveFactor = new(4.0f, 3.6f, 1.8f),
@@ -115,31 +111,29 @@ internal sealed class RenderingPbrSceneExample : ExampleBase {
 			RoughnessFactor = 1.0f
 		}).Expect("Failed to create point light marker material.");
 
-		var leftInstanceResult = _scene.AddModelInstance(
+		_leftInstance = _scene.AddModelInstance(
 			cubeModel,
 			sharedMaterial,
 			Matrix4x4.CreateTranslation(-1.4f, 0.0f, 0.0f)
-		);
-		var rightInstanceResult = _scene.AddModelInstance(
+		).Expect("Failed to create left model instance.");
+
+		_rightInstance = _scene.AddModelInstance(
 			cubeModel,
 			sharedMaterial,
 			Matrix4x4.CreateTranslation(1.4f, 0.0f, 0.0f)
-		);
-		var centerInstanceResult = _scene.AddModelInstance(
+		).Expect("Failed to create right model instance.");
+
+		_centerInstance = _scene.AddModelInstance(
 			cubeModel,
 			variantMaterial,
 			Matrix4x4.CreateTranslation(0.0f, 0.0f, -2.0f)
-		);
-		var pointLightMarkerResult = _scene.AddModelInstance(
+		).Expect("Failed to create center model instance.");
+
+		_pointLightMarker = _scene.AddModelInstance(
 			cubeModel,
 			lightMarkerMaterial,
 			BuildTransform(new(2.0f, 1.8f, 1.8f), Quaternion.Identity, 0.18f)
-		);
-		_leftInstance = leftInstanceResult.Expect("Failed to create left model instance.");
-		_rightInstance = rightInstanceResult.Expect("Failed to create right model instance.");
-		_centerInstance = centerInstanceResult.Expect("Failed to create center model instance.");
-		_pointLightMarker = pointLightMarkerResult.Expect("Failed to create point light marker instance.");
-		_time = 0.0f;
+		).Expect("Failed to create point light marker instance.");
 
 		return Unit.Value;
 	}
@@ -151,7 +145,7 @@ internal sealed class RenderingPbrSceneExample : ExampleBase {
 
 		_time += (float)deltaTimeSeconds;
 
-		var leftTransformResult = _scene.SetModelInstanceTransform(
+		_scene.SetModelInstanceTransform(
 			_leftInstance,
 			BuildTransform(
 				new(-1.4f, 0.0f, 0.0f),
@@ -159,11 +153,8 @@ internal sealed class RenderingPbrSceneExample : ExampleBase {
 				1.0f
 			)
 		);
-		if (leftTransformResult.IsErr) {
-			return leftTransformResult;
-		}
 
-		var rightTransformResult = _scene.SetModelInstanceTransform(
+		_scene.SetModelInstanceTransform(
 			_rightInstance,
 			BuildTransform(
 				new(1.4f, 0.0f, 0.0f),
@@ -171,11 +162,8 @@ internal sealed class RenderingPbrSceneExample : ExampleBase {
 				1.0f
 			)
 		);
-		if (rightTransformResult.IsErr) {
-			return rightTransformResult;
-		}
 
-		var centerTransformResult = _scene.SetModelInstanceTransform(
+		_scene.SetModelInstanceTransform(
 			_centerInstance,
 			BuildTransform(
 				new(0.0f, 0.0f, -2.0f),
@@ -183,9 +171,6 @@ internal sealed class RenderingPbrSceneExample : ExampleBase {
 				1.0f
 			)
 		);
-		if (centerTransformResult.IsErr) {
-			return centerTransformResult;
-		}
 
 		var pointPosition = new Vector3(
 			MathF.Cos(_time * 0.8f) * 2.4f,
@@ -193,15 +178,12 @@ internal sealed class RenderingPbrSceneExample : ExampleBase {
 			MathF.Sin(_time * 0.8f) * 2.4f
 		);
 
-		var markerResult = _scene.SetModelInstanceTransform(
+		_scene.SetModelInstanceTransform(
 			_pointLightMarker,
 			BuildTransform(pointPosition, Quaternion.Identity, 0.18f)
 		);
-		if (markerResult.IsErr) {
-			return markerResult;
-		}
 
-		return _scene.SetPointLight(
+		_scene.SetPointLight(
 			_movingPointLight,
 			new PointLightDescription(
 				Position: pointPosition,
@@ -210,6 +192,8 @@ internal sealed class RenderingPbrSceneExample : ExampleBase {
 				Range: 10.0f
 			)
 		);
+
+		return Unit.Value;
 	}
 
 	public override Result<GraphicsError> OnRender(IWindowRenderContext context, double deltaTimeSeconds) {

@@ -491,7 +491,11 @@ public sealed class Renderer : IDisposable {
 		}
 
 		Result<Shader<BuiltInPbrShaderBinding>, GraphicsError> loadResult = LoadShader<BuiltInPbrShaderBinding>(
-			static warning => Console.WriteLine($"[rendering:pbr warning] {warning}")
+			static warning => {
+				if (!IsIgnorableBuiltInPbrWarning(warning)) {
+					Console.WriteLine($"[rendering:pbr warning] {warning}");
+				}
+			}
 		);
 		if (loadResult.IsErr) {
 			return loadResult.Error;
@@ -499,6 +503,17 @@ public sealed class Renderer : IDisposable {
 
 		_builtInPbrShader = loadResult.Value;
 		return _builtInPbrShader;
+	}
+
+	private static bool IsIgnorableBuiltInPbrWarning(string warning) {
+		if (string.IsNullOrWhiteSpace(warning)) {
+			return false;
+		}
+
+		return warning.Contains(
+			"Expected uniform '_engine_model_view_projection' was not active in the linked program.",
+			StringComparison.Ordinal
+		);
 	}
 
 	private static EngineSceneUniformValues BuildSceneUniformValues(

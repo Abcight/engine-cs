@@ -36,7 +36,7 @@ public sealed class World {
 		}
 	}
 
-	public void AddComponent<T>(Entity entity, T component) where T : unmanaged {
+	public void AddComponent<T>(Entity entity, T component) where T : notnull {
 		var key = typeof(T);
 
 		if (!stores.TryGetValue(key, out var store)) {
@@ -47,13 +47,13 @@ public sealed class World {
 		store.Set(entity, component);
 	}
 
-	public void RemoveComponent<T>(Entity entity) where T : unmanaged {
+	public void RemoveComponent<T>(Entity entity) where T : notnull {
 		if (stores.TryGetValue(typeof(T), out var store)) {
 			store.Unset(entity);
 		}
 	}
 
-	public ComponentStore GetStore<T>() where T : unmanaged {
+	public ComponentStore GetStore<T>() where T : notnull {
 		var key = typeof(T);
 		if (!stores.TryGetValue(key, out var store)) {
 			store = ComponentStore.For<T>();
@@ -63,7 +63,7 @@ public sealed class World {
 	}
 
 	public void ForEach<TA>(RefAction1<TA> action)
-		where TA : unmanaged {
+		where TA : notnull {
 		var aStore = GetStore<TA>();
 
 		for (int i = 0; i < aStore.Length; i++) {
@@ -76,8 +76,8 @@ public sealed class World {
 	}
 
 	public void ForEach<TA, TB>(RefAction2<TA, TB> action)
-	where TA : unmanaged
-	where TB : unmanaged {
+	where TA : notnull
+	where TB : notnull {
 		var aStore = GetStore<TA>();
 		var bStore = GetStore<TB>();
 
@@ -95,9 +95,9 @@ public sealed class World {
 	}
 
 	public void ForEach<TA, TB, TC>(RefAction3<TA, TB, TC> action)
-	where TA : unmanaged
-	where TB : unmanaged
-	where TC : unmanaged {
+	where TA : notnull
+	where TB : notnull
+	where TC : notnull {
 		var aStore = GetStore<TA>();
 		var bStore = GetStore<TB>();
 		var cStore = GetStore<TC>();
@@ -117,10 +117,10 @@ public sealed class World {
 	}
 
 	public void ForEach<TA, TB, TC, TD>(RefAction4<TA, TB, TC, TD> action)
-	where TA : unmanaged
-	where TB : unmanaged
-	where TC : unmanaged
-	where TD : unmanaged {
+	where TA : notnull
+	where TB : notnull
+	where TC : notnull
+	where TD : notnull {
 		var aStore = GetStore<TA>();
 		var bStore = GetStore<TB>();
 		var cStore = GetStore<TC>();

@@ -1,33 +1,31 @@
-using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
-
 namespace Engine.ECS;
 
 public sealed class ComponentStore {
 	private const int DEFAULT_CAPACITY = 128;
 	private const int SPARSE_NULL = int.MaxValue;
 
-	private readonly DenseStore dense;
+	private readonly Type componentType;
+	private readonly IDenseStore dense;
 	private int[] sparseToDense = new int[DEFAULT_CAPACITY];
 	private int[] denseToSparse = new int[DEFAULT_CAPACITY];
 	private int[] sparseGenerations = new int[DEFAULT_CAPACITY];
 
-	private ComponentStore(DenseStore dense) {
+	private ComponentStore(Type componentType, IDenseStore dense) {
+		this.componentType = componentType;
 		this.dense = dense;
 		Array.Fill(sparseToDense, SPARSE_NULL);
 		Array.Fill(sparseGenerations, SPARSE_NULL);
 		Array.Fill(denseToSparse, SPARSE_NULL);
 	}
 
-	public static ComponentStore For<T>() where T : unmanaged {
-		int stride = Unsafe.SizeOf<T>();
-		var dense = new DenseStore(stride);
-		return new ComponentStore(dense);
+	public static ComponentStore For<T>() where T : notnull {
+		return new ComponentStore(typeof(T), new DenseStore<T>());
 	}
 
 	public int Length => dense.Length;
 
-	public void Set<T>(Entity entity, T value) where T : unmanaged {
+	public void Set<T>(Entity entity, T value) where T : notnull {
+		DenseStore<T> typedDense = getDenseStore<T>();
 		var index = entity.index;
 		if (index < 0 || entity.generation < 0) {
 			return;
@@ -41,16 +39,16 @@ public sealed class ComponentStore {
 				return;
 			}
 
-			dense.Set(denseIndex, value);
+			typedDense.Set(denseIndex, value);
 			return;
 		}
 
-		denseIndex = dense.Length;
+		denseIndex = typedDense.Length;
 		ensureDenseCapacity(denseIndex + 1);
 		sparseToDense[index] = denseIndex;
 		denseToSparse[denseIndex] = index;
 		sparseGenerations[index] = entity.generation;
-		dense.Set(denseIndex, value);
+		typedDense.Set(denseIndex, value);
 	}
 
 	public void Unset(Entity entity) {
@@ -90,8 +88,8 @@ public sealed class ComponentStore {
 		return sparseToDense[index] != SPARSE_NULL && sparseGenerations[index] == entity.generation;
 	}
 
-	public ref T GetUnchecked<T>(Entity entity) where T : unmanaged {
-		return ref dense.Get<T>(sparseToDense[entity.index]);
+	public ref T GetUnchecked<T>(Entity entity) where T : notnull {
+		return ref getDenseStore<T>().Get(sparseToDense[entity.index]);
 	}
 
 	public Entity GetEntityFromDenseIdx(int denseIndex) {
@@ -132,36 +130,45 @@ public sealed class ComponentStore {
 		}
 	}
 
-	private sealed class DenseStore {
-		private byte[] buffer = [];
+	private DenseStore<T> getDenseStore<T>() where T : notnull {
+		if (componentType != typeof(T)) {
+			throw new InvalidOperationException(
+				$"Component store mismatch. Store is '{componentType.Name}', requested '{typeof(T).Name}'."
+			);
+		}
+
+		return (DenseStore<T>)dense;
+	}
+
+	private interface IDenseStore {
+		int Length { get; }
+		void Swap(int a, int b);
+		void RemoveLast();
+	}
+
+	private sealed class DenseStore<T> : IDenseStore where T : notnull {
+		private T[] values = [];
 		private int count;
-		private readonly int stride;
 
 		public int Length => count;
 
-		public DenseStore(int stride) {
-			this.stride = stride;
-		}
-
-		public void Set<T>(int index, T value) where T : unmanaged {
-			var needed = (index + 1) * stride;
-			if (needed > buffer.Length) {
-				var grown = buffer.Length == 0 ? stride : buffer.Length * 2;
-				Array.Resize(ref buffer, Math.Max(grown, needed));
+		public void Set(int index, T value) {
+			var needed = index + 1;
+			if (needed > values.Length) {
+				var grown = values.Length == 0 ? DEFAULT_CAPACITY : values.Length * 2;
+				Array.Resize(ref values, Math.Max(grown, needed));
 			}
 
-			count = Math.Max(index + 1, count);
-			var span = buffer.AsSpan(index * stride, stride);
-			MemoryMarshal.Write(span, in value);
+			count = Math.Max(needed, count);
+			values[index] = value;
 		}
 
-		public ref T Get<T>(int index) where T : unmanaged {
+		public ref T Get(int index) {
 			if (index < 0 || index >= count) {
 				throw new ArgumentOutOfRangeException(nameof(index));
 			}
 
-			var span = buffer.AsSpan(index * stride, stride);
-			return ref MemoryMarshal.AsRef<T>(span);
+			return ref values[index];
 		}
 
 		public void Swap(int a, int b) {
@@ -169,18 +176,12 @@ public sealed class ComponentStore {
 				return;
 			}
 
-			var spanA = buffer.AsSpan(a * stride, stride);
-			var spanB = buffer.AsSpan(b * stride, stride);
-
-			for (int i = 0; i < stride; i++) {
-				byte tmp = spanA[i];
-				spanA[i] = spanB[i];
-				spanB[i] = tmp;
-			}
+			(values[a], values[b]) = (values[b], values[a]);
 		}
 
 		public void RemoveLast() {
 			if (count > 0) {
+				Array.Clear(values, count - 1, 1);
 				count--;
 			}
 		}

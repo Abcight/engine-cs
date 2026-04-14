@@ -6,31 +6,31 @@ public sealed class World {
 	public delegate void RefAction2<TA, TB>(Entity entity, ref TA a, ref TB b);
 	public delegate void RefAction3<TA, TB, TC>(Entity entity, ref TA a, ref TB b, ref TC c);
 	public delegate void RefAction4<TA, TB, TC, TD>(Entity entity, ref TA a, ref TB b, ref TC c, ref TD d);
-	private List<SystemDelegate> _systems = new();
-	private Stack<Entity> _freeEntities = new();
+	private List<SystemDelegate> systems = new();
+	private Stack<Entity> freeEntities = new();
 	private Dictionary<Type, ComponentStore> stores = new();
-	private int _highestIndex = 0;
+	private int highestIndex = 0;
 
 	public void AddSystem<T>() where T : ISystem<T> {
-		_systems.Add(T.Update);
+		systems.Add(T.Update);
 	}
 
 	public void RemoveSystem<T>() where T : ISystem<T> {
-		_systems.Remove(T.Update);
+		systems.Remove(T.Update);
 	}
 
 	public Entity CreateEntity() {
-		if (_freeEntities.TryPop(out Entity result)) {
+		if (freeEntities.TryPop(out Entity result)) {
 			result.generation += 1;
 			return result;
 		}
-		Entity ret = new Entity(_highestIndex, 0);
-		_highestIndex += 1;
+		Entity ret = new Entity(highestIndex, 0);
+		highestIndex += 1;
 		return ret;
 	}
 
 	public void DestroyEntity(Entity entity) {
-		_freeEntities.Push(entity);
+		freeEntities.Push(entity);
 		foreach (var store in stores.Values) {
 			store.Unset(entity);
 		}
@@ -69,7 +69,7 @@ public sealed class World {
 		for (int i = 0; i < aStore.Length; i++) {
 			var entity = aStore.GetEntityFromDenseIdx(i);
 
-			ref var a = ref aStore.Get<TA>(entity);
+			ref var a = ref aStore.GetUnchecked<TA>(entity);
 
 			action(entity, ref a);
 		}
@@ -87,8 +87,8 @@ public sealed class World {
 			if (!bStore.Has(entity))
 				continue;
 
-			ref var a = ref aStore.Get<TA>(entity);
-			ref var b = ref bStore.Get<TB>(entity);
+			ref var a = ref aStore.GetUnchecked<TA>(entity);
+			ref var b = ref bStore.GetUnchecked<TB>(entity);
 
 			action(entity, ref a, ref b);
 		}
@@ -108,9 +108,9 @@ public sealed class World {
 			if (!bStore.Has(entity)) continue;
 			if (!cStore.Has(entity)) continue;
 
-			ref var a = ref aStore.Get<TA>(entity);
-			ref var b = ref bStore.Get<TB>(entity);
-			ref var c = ref cStore.Get<TC>(entity);
+			ref var a = ref aStore.GetUnchecked<TA>(entity);
+			ref var b = ref bStore.GetUnchecked<TB>(entity);
+			ref var c = ref cStore.GetUnchecked<TC>(entity);
 
 			action(entity, ref a, ref b, ref c);
 		}
@@ -133,10 +133,10 @@ public sealed class World {
 			if (!cStore.Has(entity)) continue;
 			if (!dStore.Has(entity)) continue;
 
-			ref var a = ref aStore.Get<TA>(entity);
-			ref var b = ref bStore.Get<TB>(entity);
-			ref var c = ref cStore.Get<TC>(entity);
-			ref var d = ref dStore.Get<TD>(entity);
+			ref var a = ref aStore.GetUnchecked<TA>(entity);
+			ref var b = ref bStore.GetUnchecked<TB>(entity);
+			ref var c = ref cStore.GetUnchecked<TC>(entity);
+			ref var d = ref dStore.GetUnchecked<TD>(entity);
 
 			action(entity, ref a, ref b, ref c, ref d);
 		}
